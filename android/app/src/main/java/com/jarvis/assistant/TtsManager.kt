@@ -52,6 +52,8 @@ object TtsManager {
         }
     }
 
+    fun isReady(): Boolean = ready && engine != null
+
     fun speak(text: String, onDone: (() -> Unit)? = null) {
         main.post { speakNow(text, onDone) }
     }

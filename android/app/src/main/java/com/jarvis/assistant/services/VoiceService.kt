@@ -71,11 +71,24 @@ class VoiceService : Service() {
             }
         }
         settings = SettingsStore.load(this)
-        startForegroundCompat(buildNotification("Starting…"))
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
             != PackageManager.PERMISSION_GRANTED
         ) {
-            updateNotification("Microphone permission is required")
+            try {
+                startForeground(
+                    NOTIF_ID,
+                    buildNotification("Microphone permission is required"),
+                    0,
+                )
+            } catch (_: Throwable) {
+            }
+            stopSelf()
+            return START_NOT_STICKY
+        }
+        try {
+            startForegroundCompat(buildNotification("Starting…"))
+        } catch (e: Throwable) {
+            state = "stopped"
             stopSelf()
             return START_NOT_STICKY
         }
@@ -305,6 +318,10 @@ class VoiceService : Service() {
     }
 
     private fun speakThen(text: String, next: () -> Unit) {
+        if (!TtsManager.isReady()) {
+            main.postDelayed(next, 150)
+            return
+        }
         val finished = AtomicBoolean(false)
         val action = {
             if (finished.compareAndSet(false, true)) {
