@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Jarvis</string>
+    <string name="accessibility_description">Jarvis uses accessibility to read the screen, tap, swipe and type in any app on this device.</string>
+</resources>

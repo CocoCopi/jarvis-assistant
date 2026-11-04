@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/jarvis_bg"
+    android:fitsSystemWindows="true"
+    android:orientation="vertical"
+    android:padding="12dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:fontFamily="sans-serif-light"
+        android:letterSpacing="0.18"
+        android:text="J.A.R.V.I.S."
+        android:textColor="@color/jarvis_cyan"
+        android:textSize="26sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:fontFamily="monospace"
+        android:text="initialising"
+        android:textColor="@color/jarvis_dim"
+        android:textSize="11sp" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="8dp"
+        android:background="@color/jarvis_surface_2" />
+
+    <ScrollView
+        android:id="@+id/scroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="8dp"
+        android:scrollbars="vertical">
+
+        <LinearLayout
+            android:id="@+id/chat"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingBottom="8dp" />
+    </ScrollView>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <EditText
+            android:id="@+id/input"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="@color/jarvis_surface"
+            android:hint="Ask Jarvis anything…"
+            android:imeOptions="actionSend"
+            android:inputType="textCapSentences|textMultiLine"
+            android:maxLines="4"
+            android:padding="12dp"
+            android:textColor="@color/jarvis_text"
+            android:textColorHint="@color/jarvis_dim"
+            android:textSize="15sp" />
+
+        <Button
+            android:id="@+id/send"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:backgroundTint="@color/jarvis_cyan"
+            android:text="SEND"
+            android:textColor="@color/black" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/talk"
+            style="?android:attr/buttonBarButtonStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="TALK"
+            android:textColor="@color/jarvis_cyan"
+            android:textSize="11sp" />
+
+        <Button
+            android:id="@+id/always"
+            style="?android:attr/buttonBarButtonStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="ALWAYS"
+            android:textColor="@color/jarvis_cyan"
+            android:textSize="11sp" />
+
+        <Button
+            android:id="@+id/access"
+            style="?android:attr/buttonBarButtonStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="ACCESS"
+            android:textColor="@color/jarvis_cyan"
+            android:textSize="11sp" />
+
+        <Button
+            android:id="@+id/settings"
+            style="?android:attr/buttonBarButtonStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="SETTINGS"
+            android:textColor="@color/jarvis_cyan"
+            android:textSize="11sp" />
+
+        <Button
+            android:id="@+id/update"
+            style="?android:attr/buttonBarButtonStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="UPDATE"
+            android:textColor="@color/jarvis_cyan"
+            android:textSize="11sp" />
+    </LinearLayout>
+</LinearLayout>

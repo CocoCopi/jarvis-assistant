@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jarvis-assistant"
+version = "0.4.0"
+description = "A voice-first, pluggable-LLM personal assistant."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = []
+
+[project.optional-dependencies]
+voice = [
+    "numpy>=1.26",
+    "sounddevice>=0.4.6",
+    "faster-whisper>=1.0",
+    "edge-tts>=6.1",
+]
+offline = [
+    "numpy>=1.26",
+    "sounddevice>=0.4.6",
+    "faster-whisper>=1.0",
+    "pyttsx3>=2.90",
+]
+desktop = [
+    "pyautogui>=0.9.54",
+    "pillow>=10.0",
+    "pyperclip>=1.8",
+]
+all = [
+    "numpy>=1.26",
+    "sounddevice>=0.4.6",
+    "faster-whisper>=1.0",
+    "edge-tts>=6.1",
+    "pyautogui>=0.9.54",
+    "pillow>=10.0",
+    "pyperclip>=1.8",
+]
+
+[project.scripts]
+jarvis = "jarvis.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["jarvis*"]

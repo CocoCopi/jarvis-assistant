@@ -1,0 +1,3 @@
+-keep class com.jarvis.assistant.bridge.DeviceBridge { *; }
+-keep class com.jarvis.assistant.services.** { *; }
+-keep class com.chaquo.python.** { *; }

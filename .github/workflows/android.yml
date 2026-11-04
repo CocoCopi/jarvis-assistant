@@ -1,0 +1,126 @@
+name: Android
+
+on:
+  push:
+    branches: [main, master]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source:
+    if: github.event_name == 'push' && github.ref_type == 'branch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Test shared Python core
+        run: python -m unittest discover -s tests -q
+      - name: Package update source
+        run: python scripts/package_android_source.py --out dist --version "${GITHUB_SHA::12}"
+      - name: Publish source prerelease
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: source-${{ github.sha }}
+          name: Jarvis source ${{ github.sha }}
+          prerelease: true
+          generate_release_notes: false
+          files: dist/*
+
+  apk:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    env:
+      JARVIS_KEYSTORE: ${{ github.workspace }}/release.keystore
+      JARVIS_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      JARVIS_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      JARVIS_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Test shared Python core
+        run: python -m unittest discover -s tests -q
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK 36
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.14.3"
+      - name: Package update source
+        run: python scripts/package_android_source.py --out dist
+      - name: Prepare signing
+        id: signing
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF_TYPE}" == "tag" && -z "${KEYSTORE_BASE64}" ]]; then
+            echo "A signed APK is required for tags. Add ANDROID_KEYSTORE_BASE64." >&2
+            exit 1
+          fi
+          if [[ -n "${KEYSTORE_BASE64}" ]]; then
+            printf '%s' "${KEYSTORE_BASE64}" | base64 --decode > "${JARVIS_KEYSTORE}"
+            echo "build_type=Release" >> "$GITHUB_OUTPUT"
+          else
+            echo "build_type=Debug" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Set version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          CODE=$(git rev-list --count HEAD)
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            NAME="${GITHUB_REF_NAME#v}"
+          else
+            NAME="0.5.0-${GITHUB_SHA::7}"
+          fi
+          echo "name=${NAME}" >> "$GITHUB_OUTPUT"
+          echo "code=${CODE}" >> "$GITHUB_OUTPUT"
+      - name: Build ${{ steps.signing.outputs.build_type }} APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle --no-daemon -p android "assemble${{ steps.signing.outputs.build_type }}" \
+            -PjarvisRepo="${GITHUB_REPOSITORY}" \
+            -PversionName="${{ steps.version.outputs.name }}" \
+            -PversionCode="${{ steps.version.outputs.code }}"
+      - name: Collect artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=$(find android/app/build/outputs/apk -name '*.apk' -print -quit)
+          if [[ -z "$APK" ]]; then
+            echo "No APK was produced." >&2
+            exit 1
+          fi
+          cp "$APK" "dist/jarvis-${{ steps.version.outputs.name }}.apk"
+          ls -lh dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jarvis-android
+          path: dist/*
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Jarvis ${{ github.ref_name }}
+          generate_release_notes: true
+          files: dist/*
