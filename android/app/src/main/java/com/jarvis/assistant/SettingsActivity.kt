@@ -199,7 +199,7 @@ class SettingsActivity : AppCompatActivity() {
             boxBackgroundMode = TextInputLayout.BOX_BACKGROUND_OUTLINE
             boxBackgroundColor = getColor(R.color.jarvis_surface)
             boxStrokeColor = getColor(R.color.jarvis_cyan_dark)
-            hintTextColor = getColor(R.color.jarvis_dim)
+            setHintTextColor(getColor(R.color.jarvis_dim))
             setBoxCornerRadii(dp(14).toFloat(), dp(14).toFloat(), dp(14).toFloat(), dp(14).toFloat())
             setPadding(0, dp(8), 0, 0)
         }

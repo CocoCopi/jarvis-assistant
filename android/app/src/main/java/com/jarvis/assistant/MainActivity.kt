@@ -238,12 +238,14 @@ class MainActivity : AppCompatActivity() {
                 topMargin = dp(3)
                 bottomMargin = dp(3)
             }
-            cardBackgroundColor = ContextCompat.getColor(
-                this@MainActivity,
-                if (dim) R.color.jarvis_surface else R.color.jarvis_card,
+            setCardBackgroundColor(
+                ContextCompat.getColor(
+                    this@MainActivity,
+                    if (dim) R.color.jarvis_surface else R.color.jarvis_card,
+                ),
             )
             radius = dp(16).toFloat()
-            strokeColor = ContextCompat.getColor(this@MainActivity, R.color.jarvis_card_stroke)
+            setStrokeColor(ContextCompat.getColor(this@MainActivity, R.color.jarvis_card_stroke))
             strokeWidth = if (dim) 0 else dp(1)
             cardElevation = 0f
             setContentPadding(dp(12), dp(9), dp(12), dp(9))

@@ -61,9 +61,9 @@ class PermissionsActivity : AppCompatActivity() {
         }
         root.addView(
             MaterialCardView(this).apply {
-                cardBackgroundColor = getColor(R.color.jarvis_surface)
+                setCardBackgroundColor(getColor(R.color.jarvis_surface))
                 radius = dp(18).toFloat()
-                strokeColor = getColor(R.color.jarvis_card_stroke)
+                setStrokeColor(getColor(R.color.jarvis_card_stroke))
                 strokeWidth = dp(1)
                 cardElevation = 0f
                 addView(status)

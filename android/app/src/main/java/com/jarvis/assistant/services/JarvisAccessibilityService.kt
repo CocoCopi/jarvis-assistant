@@ -294,7 +294,7 @@ class JarvisAccessibilityService : AccessibilityService() {
 
     fun scrollToNode(id: String): String {
         val node = resolve(id) ?: return "Unknown or stale node: $id"
-        if (node.performAction(AccessibilityNodeInfo.ACTION_SHOW_ON_SCREEN)) {
+        if (node.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_SHOW_ON_SCREEN.id)) {
             return "Scrolled $id into view."
         }
         return "Could not scroll $id into view."
@@ -314,7 +314,7 @@ class JarvisAccessibilityService : AccessibilityService() {
             "paste" -> AccessibilityNodeInfo.ACTION_PASTE
             "scroll_forward" -> AccessibilityNodeInfo.ACTION_SCROLL_FORWARD
             "scroll_backward" -> AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD
-            "show_on_screen" -> AccessibilityNodeInfo.ACTION_SHOW_ON_SCREEN
+            "show_on_screen" -> AccessibilityNodeInfo.AccessibilityAction.ACTION_SHOW_ON_SCREEN.id
             "dismiss" -> AccessibilityNodeInfo.ACTION_DISMISS
             "collapse" -> AccessibilityNodeInfo.ACTION_COLLAPSE
             "expand" -> AccessibilityNodeInfo.ACTION_EXPAND
@@ -537,7 +537,7 @@ class JarvisAccessibilityService : AccessibilityService() {
 
     private fun focusedEditable(): AccessibilityNodeInfo? {
         val queue = ArrayDeque<AccessibilityNodeInfo>()
-        windowRoots().forEach { queue.add(it.second) }
+        windowRoots().forEach { queue.add(it.root) }
         var visited = 0
         while (queue.isNotEmpty() && visited < 700) {
             visited += 1
