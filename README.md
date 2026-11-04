@@ -160,7 +160,7 @@ base64 -w0 release.keystore        # paste into ANDROID_KEYSTORE_BASE64
 - `ANDROID_KEY_ALIAS` (the alias defaults to `jarvis`)
 - `ANDROID_KEY_PASSWORD` (optional; defaults to the keystore password)
 
-Then push a tag such as `v0.6.0`. The workflow builds and signs the APK, packages
+Then push a tag such as `v0.6.1`. The workflow builds and signs the APK, packages
 the Python source, and attaches both to that GitHub release. Install the APK
 once. Future code updates are downloaded by the app; APK updates use the same
 signature and keep app data. A different signing key always requires one
