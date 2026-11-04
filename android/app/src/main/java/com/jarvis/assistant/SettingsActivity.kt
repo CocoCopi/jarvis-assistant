@@ -1,5 +1,6 @@
 package com.jarvis.assistant
 
+import android.content.res.ColorStateList
 import android.os.Bundle
 import android.text.InputType
 import android.util.TypedValue
@@ -199,7 +200,7 @@ class SettingsActivity : AppCompatActivity() {
             boxBackgroundMode = TextInputLayout.BOX_BACKGROUND_OUTLINE
             boxBackgroundColor = getColor(R.color.jarvis_surface)
             boxStrokeColor = getColor(R.color.jarvis_cyan_dark)
-            setHintTextColor(getColor(R.color.jarvis_dim))
+            setHintTextColor(ColorStateList.valueOf(getColor(R.color.jarvis_dim)))
             setBoxCornerRadii(dp(14).toFloat(), dp(14).toFloat(), dp(14).toFloat(), dp(14).toFloat())
             setPadding(0, dp(8), 0, 0)
         }
@@ -208,7 +209,7 @@ class SettingsActivity : AppCompatActivity() {
             this.inputType = inputType
             this.minLines = minLines
             setTextColor(getColor(R.color.jarvis_text))
-            setHintTextColor(getColor(R.color.jarvis_dim))
+            setHintTextColor(ColorStateList.valueOf(getColor(R.color.jarvis_dim)))
             setPadding(dp(12), dp(10), dp(12), dp(10))
             if (minLines > 1) gravity = android.view.Gravity.TOP
         }
