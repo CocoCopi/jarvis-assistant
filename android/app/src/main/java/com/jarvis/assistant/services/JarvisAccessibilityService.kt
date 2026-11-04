@@ -226,7 +226,7 @@ class JarvisAccessibilityService : AccessibilityService() {
         }
         if (key == "enter" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             val node = findFocusedEditable(root) ?: return "No focused text field."
-            val ok = node.performAction(AccessibilityNodeInfo.ACTION_IME_ENTER)
+            val ok = node.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.id)
             return if (ok) "Pressed enter." else "Could not press enter."
         }
         return "Unsupported key: $name"
