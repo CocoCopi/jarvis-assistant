@@ -48,6 +48,14 @@ class VoiceService : Service() {
         startListening()
     }
 
+    private var lastPartial = ""
+    private val partialArm = Runnable {
+        if (!running || processing || armed) return@Runnable
+        if (commandAfterWakeWord(lastPartial)?.isBlank() == true) {
+            armAndPrompt()
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         running = true
@@ -89,6 +97,7 @@ class VoiceService : Service() {
 
     private fun startListening() {
         if (!running || processing || listening) return
+        main.removeCallbacks(partialArm)
         if (armed && SystemClock.elapsedRealtime() - armedAt > WAKE_WINDOW_MS) {
             armed = false
         }
@@ -166,11 +175,14 @@ class VoiceService : Service() {
         override fun onResults(results: Bundle?) {
             listening = false
             main.removeCallbacks(watchdog)
+            main.removeCallbacks(partialArm)
             destroyRecognizer()
             val text = firstResult(results)
             if (text.isBlank()) {
                 if (armed) {
                     speakThen("I'm listening.") { if (running) startListening() }
+                } else if (commandAfterWakeWord(lastPartial)?.isBlank() == true) {
+                    armAndPrompt()
                 } else {
                     retry()
                 }
@@ -184,10 +196,12 @@ class VoiceService : Service() {
             if (text.isBlank()) return
             updateNotification(text.take(90))
             if (processing) return
+            lastPartial = text
+            main.removeCallbacks(partialArm)
             if (settings.useWakeWord && !armed) {
                 val command = commandAfterWakeWord(text)
                 if (command != null && command.isBlank()) {
-                    armAndPrompt()
+                    main.postDelayed(partialArm, 800)
                 }
             }
         }
@@ -223,6 +237,7 @@ class VoiceService : Service() {
 
     private fun armAndPrompt() {
         if (processing) return
+        main.removeCallbacks(partialArm)
         armed = true
         armedAt = SystemClock.elapsedRealtime()
         ignoreRecognizerErrors = true

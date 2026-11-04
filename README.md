@@ -66,6 +66,7 @@ Everything (voice + desktop + web + phone control) is installed by `install.sh`:
 | Web | `web_search`, `fetch_url`, `http_request` | no |
 | Desktop | `screenshot`, `mouse_control`, `keyboard_control`, `clipboard`, `power` | power |
 | Phone | `phone_control`, `phone_shell`, `phone_adb`, `phone_install`, `phone_uninstall` | shell, adb, install, uninstall |
+| Android app | `android_screen`, `android_node`, `android_gesture`, `android_text`, `android_notifications`, `android_apps`, `android_shell` | shell, SMS, install, device admin, Python |
 | Memory | `remember`, `recall`, `forget`, `set_timer` | no |
 | Apps | `open_app` | no |
 | Self-extension | `create_skill`, `delete_skill`, `list_skills` | create |
@@ -116,11 +117,27 @@ unrestricted.
 
 ### Native Android app
 
-The `android/` directory is a Chaquopy app that runs the same Python core on
-the phone itself. It is not the ADB client: it has native access to
+The `android/` directory is a Material 3 Chaquopy app that runs the same Python
+core on the phone itself. It is not the ADB client: it has native access to
 accessibility, notifications, shell, root, SMS, calls, intents, files,
 installers, device admin and arbitrary Python. The app is `com.jarvis.assistant`
 and needs Android 11 or newer.
+
+The accessibility layer is a full on-device remote-control engine, not just
+screen reading. It can enumerate every interactive window (including system
+dialogs and the keyboard), return stable node IDs with bounds/flags, click or
+long-click nodes, scroll nodes, scroll nodes into view, perform raw
+accessibility actions, type/append/insert/replace text, press keys, tap,
+long-press, double-tap, swipe, scroll, pinch, and run arbitrary multi-touch
+paths. It also reads notifications and can open, dismiss, snooze, press
+notification actions, and reply through notification RemoteInput.
+
+Wake word: open the app, tap **ALWAYS**, grant microphone and notification
+permission, and say **"Jarvis"**. The service listens in short sessions,
+restarts after silence/errors, detects the wake word from partial results after
+a short quiet window, and always resumes even if TTS never reports completion.
+On Android 14+ a microphone foreground service cannot always start itself after
+a reboot; open the app once and tap **ALWAYS** if wake word is inactive.
 
 Builds are done by GitHub Actions because this project does not require a local
 Android SDK. The repository must be public for the app to fetch releases without
@@ -143,7 +160,7 @@ base64 -w0 release.keystore        # paste into ANDROID_KEYSTORE_BASE64
 - `ANDROID_KEY_ALIAS` (the alias defaults to `jarvis`)
 - `ANDROID_KEY_PASSWORD` (optional; defaults to the keystore password)
 
-Then push a tag such as `v0.5.0`. The workflow builds and signs the APK, packages
+Then push a tag such as `v0.6.0`. The workflow builds and signs the APK, packages
 the Python source, and attaches both to that GitHub release. Install the APK
 once. Future code updates are downloaded by the app; APK updates use the same
 signature and keep app data. A different signing key always requires one
