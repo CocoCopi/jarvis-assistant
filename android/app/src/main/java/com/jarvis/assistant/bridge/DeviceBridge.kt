@@ -141,14 +141,104 @@ object DeviceBridge {
     }
 
     @JvmStatic
-    fun uiDump(): String = guarded {
-        service()?.dumpUi() ?: "Accessibility service is not enabled. Open Access and enable Jarvis."
+    fun uiDump(): String = screenState(false, false)
+
+    @JvmStatic
+    fun screenState(includeScreenshot: Boolean, annotate: Boolean): String = guarded {
+        service()?.screenState(includeScreenshot, annotate)
+            ?: "Accessibility service is not enabled. Open Access and enable Jarvis."
+    }
+
+    @JvmStatic
+    fun findNodes(query: String, by: String, exact: Boolean, includeOffscreen: Boolean): String = guarded {
+        service()?.findNodes(query, by, exact, includeOffscreen)
+            ?: "Accessibility service is not enabled."
+    }
+
+    @JvmStatic
+    fun nodeDetails(id: String): String = guarded {
+        service()?.nodeDetails(id) ?: "Accessibility service is not enabled."
+    }
+
+    @JvmStatic
+    fun clickNode(id: String, long: Boolean): String = guarded {
+        service()?.clickNode(id, long) ?: "Accessibility service is not enabled."
+    }
+
+    @JvmStatic
+    fun tapNode(id: String): String = guarded {
+        service()?.tapNode(id) ?: "Accessibility service is not enabled."
+    }
+
+    @JvmStatic
+    fun scrollNode(id: String, direction: String): String = guarded {
+        service()?.scrollNode(id, direction) ?: "Accessibility service is not enabled."
+    }
+
+    @JvmStatic
+    fun scrollToNode(id: String): String = guarded {
+        service()?.scrollToNode(id) ?: "Accessibility service is not enabled."
+    }
+
+    @JvmStatic
+    fun nodeAction(id: String, action: String): String = guarded {
+        service()?.nodeAction(id, action) ?: "Accessibility service is not enabled."
     }
 
     @JvmStatic
     fun clickText(text: String, exact: Boolean): String = guarded {
         service()?.clickText(text, exact)
             ?: "Accessibility service is not enabled. Open Access and enable Jarvis."
+    }
+
+    @JvmStatic
+    fun longPress(x: Int, y: Int, duration: Int): String = guarded {
+        service()?.longPress(x, y, duration) ?: "Accessibility service is not enabled."
+    }
+
+    @JvmStatic
+    fun doubleTap(x: Int, y: Int): String = guarded {
+        service()?.doubleTap(x, y) ?: "Accessibility service is not enabled."
+    }
+
+    @JvmStatic
+    fun scrollDirection(direction: String, amountPercent: Int): String = guarded {
+        service()?.scrollDirection(direction, amountPercent) ?: "Accessibility service is not enabled."
+    }
+
+    @JvmStatic
+    fun pinch(centerX: Int, centerY: Int, scale: Float, duration: Int): String = guarded {
+        service()?.pinch(centerX, centerY, scale, duration) ?: "Accessibility service is not enabled."
+    }
+
+    @JvmStatic
+    fun customGesture(pathsJson: String): String = guarded {
+        service()?.customGesture(pathsJson) ?: "Accessibility service is not enabled."
+    }
+
+    @JvmStatic
+    fun typeTextEx(text: String, mode: String, nodeId: String): String = guarded {
+        service()?.typeText(text, mode, nodeId) ?: "Accessibility service is not enabled."
+    }
+
+    @JvmStatic
+    fun pressKeyEx(name: String, nodeId: String): String = guarded {
+        service()?.pressKey(name, nodeId) ?: "Accessibility service is not enabled."
+    }
+
+    @JvmStatic
+    fun waitForNode(query: String, by: String, exact: Boolean, timeout: Int): String = guarded {
+        service()?.waitForNode(query, by, exact, timeout) ?: "Accessibility service is not enabled."
+    }
+
+    @JvmStatic
+    fun waitForIdle(timeout: Int): String = guarded {
+        service()?.waitForIdle(timeout) ?: "Accessibility service is not enabled."
+    }
+
+    @JvmStatic
+    fun currentApp(): String = guarded {
+        service()?.currentApp() ?: "Accessibility service is not enabled."
     }
 
     @JvmStatic
@@ -201,7 +291,7 @@ object DeviceBridge {
             "next", "media_next" -> mediaKey(KeyEvent.KEYCODE_MEDIA_NEXT)
             "previous", "media_previous" -> mediaKey(KeyEvent.KEYCODE_MEDIA_PREVIOUS)
             "stop", "media_stop" -> mediaKey(KeyEvent.KEYCODE_MEDIA_STOP)
-            else -> service()?.key(key) ?: "Accessibility service is not enabled."
+            else -> service()?.pressKey(key) ?: "Accessibility service is not enabled."
         }
     }
 
@@ -212,9 +302,30 @@ object DeviceBridge {
     }
 
     @JvmStatic
+    fun screenshotAnnotated(path: String): String = guarded {
+        service()?.screenshot(path, true)
+            ?: "Accessibility service is not enabled. Open Access and enable Jarvis."
+    }
+
+    @JvmStatic
     fun notifications(): String = guarded {
         JarvisNotificationService.instance?.dump()
             ?: "Notification listener is not enabled. Open Access and enable Jarvis notifications."
+    }
+
+    @JvmStatic
+    fun notificationAction(action: String, key: String, index: Int, minutes: Int, text: String): String = guarded {
+        val service = JarvisNotificationService.instance
+            ?: return@guarded "Notification listener is not enabled. Open Access and enable Jarvis notifications."
+        when (action.lowercase(Locale.US)) {
+            "open" -> service.open(key)
+            "dismiss", "clear" -> service.dismiss(key)
+            "snooze" -> service.snooze(key, minutes)
+            "action", "press" -> service.action(key, index)
+            "reply" -> service.reply(key, text)
+            "details" -> service.details(key)
+            else -> "Unknown notification action: $action"
+        }
     }
 
     @JvmStatic
@@ -479,6 +590,17 @@ object DeviceBridge {
         ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         ctx.startActivity(intent)
         "Uninstall prompt opened for $packageName."
+    }
+
+    @JvmStatic
+    fun appInfo(packageName: String): String = guarded {
+        val ctx = context()
+        val intent = Intent(
+            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+            Uri.parse("package:$packageName"),
+        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        ctx.startActivity(intent)
+        "Opened app info for $packageName."
     }
 
     @JvmStatic

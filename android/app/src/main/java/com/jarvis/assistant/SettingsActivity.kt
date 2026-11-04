@@ -6,7 +6,6 @@ import android.util.TypedValue
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.Button
-import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -14,6 +13,11 @@ import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import com.google.android.material.appbar.MaterialToolbar
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.materialswitch.MaterialSwitch
+import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
 import com.jarvis.assistant.engine.CodeUpdater
 import com.jarvis.assistant.engine.JarvisEngine
 
@@ -29,10 +33,10 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var maxSteps: EditText
     private lateinit var temperature: EditText
     private lateinit var maxTokens: EditText
-    private lateinit var useWakeWord: CheckBox
-    private lateinit var autoStart: CheckBox
-    private lateinit var autoUpdate: CheckBox
-    private lateinit var unsafe: CheckBox
+    private lateinit var useWakeWord: MaterialSwitch
+    private lateinit var autoStart: MaterialSwitch
+    private lateinit var autoUpdate: MaterialSwitch
+    private lateinit var unsafe: MaterialSwitch
 
     private val providers = arrayOf("nvidia", "openai", "anthropic", "ollama")
     private val defaults = mapOf(
@@ -47,8 +51,17 @@ class SettingsActivity : AppCompatActivity() {
         val settings = SettingsStore.load(this)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(20), dp(20), dp(24))
+            setBackgroundColor(getColor(R.color.jarvis_bg))
+            setPadding(dp(16), dp(4), dp(16), dp(24))
         }
+        val toolbar = MaterialToolbar(this).apply {
+            title = "Settings"
+            subtitle = "Connection, voice and updates"
+            setTitleTextColor(getColor(R.color.jarvis_cyan))
+            setSubtitleTextColor(getColor(R.color.jarvis_dim))
+            setBackgroundColor(getColor(R.color.jarvis_bg))
+        }
+        root.addView(toolbar, matchWrap())
         val scroll = ScrollView(this).apply { addView(root) }
         setContentView(scroll)
 
@@ -181,43 +194,45 @@ class SettingsActivity : AppCompatActivity() {
         inputType: Int = InputType.TYPE_CLASS_TEXT,
         minLines: Int = 1,
     ): EditText {
-        parent.addView(
-            TextView(this).apply {
-                text = label
-                textSize = 12f
-                setTextColor(getColor(R.color.jarvis_dim))
-                setPadding(0, dp(14), 0, dp(3))
-            },
-        )
-        val field = EditText(this).apply {
+        val layout = TextInputLayout(this).apply {
+            hint = label
+            boxBackgroundMode = TextInputLayout.BOX_BACKGROUND_OUTLINE
+            boxBackgroundColor = getColor(R.color.jarvis_surface)
+            boxStrokeColor = getColor(R.color.jarvis_cyan_dark)
+            hintTextColor = getColor(R.color.jarvis_dim)
+            setBoxCornerRadii(dp(14).toFloat(), dp(14).toFloat(), dp(14).toFloat(), dp(14).toFloat())
+            setPadding(0, dp(8), 0, 0)
+        }
+        val field = TextInputEditText(this).apply {
             setText(value)
             this.inputType = inputType
             this.minLines = minLines
             setTextColor(getColor(R.color.jarvis_text))
             setHintTextColor(getColor(R.color.jarvis_dim))
-            setBackgroundColor(getColor(R.color.jarvis_surface))
-            setPadding(dp(10), dp(8), dp(10), dp(8))
+            setPadding(dp(12), dp(10), dp(12), dp(10))
             if (minLines > 1) gravity = android.view.Gravity.TOP
         }
-        parent.addView(field, matchWrap())
+        layout.addView(field)
+        parent.addView(layout, matchWrap())
         return field
     }
 
-    private fun check(label: String, checked: Boolean): CheckBox {
-        return CheckBox(this).apply {
+    private fun check(label: String, checked: Boolean): MaterialSwitch {
+        return MaterialSwitch(this).apply {
             text = label
             isChecked = checked
             setTextColor(getColor(R.color.jarvis_text))
-            setPadding(0, dp(8), 0, 0)
+            setPadding(0, dp(6), 0, dp(6))
         }
     }
 
     private fun button(label: String, action: () -> Unit): Button {
-        return Button(this).apply {
+        return MaterialButton(this).apply {
             text = label
             setOnClickListener { action() }
-            setBackgroundColor(getColor(R.color.jarvis_cyan_dark))
             setTextColor(getColor(R.color.jarvis_text))
+            setBackgroundColor(getColor(R.color.jarvis_surface_2))
+            textSize = 12f
         }
     }
 

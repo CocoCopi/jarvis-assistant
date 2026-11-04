@@ -14,6 +14,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.SystemClock
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -26,6 +27,7 @@ import com.jarvis.assistant.SettingsStore
 import com.jarvis.assistant.TtsManager
 import com.jarvis.assistant.engine.JarvisEngine
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicBoolean
 
 class VoiceService : Service() {
 
@@ -34,12 +36,22 @@ class VoiceService : Service() {
     private var listening = false
     private var processing = false
     private var armed = false
+    private var armedAt = 0L
     private var settings = SettingsStore.load(JarvisApp.instance)
     private var lastText = "Starting…"
+    private var ignoreRecognizerErrors = false
+
+    private val watchdog = Runnable {
+        if (!running || processing) return@Runnable
+        destroyRecognizer()
+        listening = false
+        startListening()
+    }
 
     override fun onCreate() {
         super.onCreate()
         running = true
+        state = "starting"
         JarvisEngine.init(applicationContext)
     }
 
@@ -60,13 +72,14 @@ class VoiceService : Service() {
             return START_NOT_STICKY
         }
         startListening()
-        return START_NOT_STICKY
+        return START_STICKY
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
         running = false
+        state = "stopped"
         main.removeCallbacksAndMessages(null)
         destroyRecognizer()
         TtsManager.stop()
@@ -76,7 +89,11 @@ class VoiceService : Service() {
 
     private fun startListening() {
         if (!running || processing || listening) return
+        if (armed && SystemClock.elapsedRealtime() - armedAt > WAKE_WINDOW_MS) {
+            armed = false
+        }
         destroyRecognizer()
+        ignoreRecognizerErrors = false
         val speech = SpeechRecognizer.createSpeechRecognizer(this)
         recognizer = speech
         speech.setRecognitionListener(listener)
@@ -87,100 +104,168 @@ class VoiceService : Service() {
             )
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.UK.toLanguageTag())
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
             putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, packageName)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1200L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1200L)
         }
         try {
             speech.startListening(intent)
             listening = true
-            val hint = if (settings.useWakeWord && !armed) {
-                "Say \"${settings.wakeWord}\""
-            } else {
-                "Listening…"
-            }
-            updateNotification(hint)
+            state = if (settings.useWakeWord && !armed) "waiting for wake word" else "listening"
+            updateNotification(
+                if (settings.useWakeWord && !armed) {
+                    "Say \"${settings.wakeWord}\""
+                } else {
+                    "Listening…"
+                },
+            )
+            main.removeCallbacks(watchdog)
+            main.postDelayed(watchdog, LISTEN_TIMEOUT_MS)
         } catch (e: Throwable) {
             listening = false
+            state = "retrying"
             retry()
         }
     }
 
     private val listener = object : RecognitionListener {
         override fun onReadyForSpeech(params: Bundle?) {
-            updateNotification(if (settings.useWakeWord && !armed) "Waiting for wake word" else "Listening…")
+            state = if (settings.useWakeWord && !armed) "waiting for wake word" else "listening"
+            updateNotification(
+                if (settings.useWakeWord && !armed) "Waiting for wake word" else "Listening…",
+            )
         }
 
-        override fun onBeginningOfSpeech() = Unit
+        override fun onBeginningOfSpeech() {
+            state = "hearing speech"
+        }
+
         override fun onRmsChanged(rmsdB: Float) = Unit
         override fun onBufferReceived(buffer: ByteArray?) = Unit
         override fun onEndOfSpeech() {
             listening = false
+            state = "processing speech"
         }
 
         override fun onError(error: Int) {
             listening = false
+            main.removeCallbacks(watchdog)
             destroyRecognizer()
             if (!running) return
+            if (ignoreRecognizerErrors) return
             if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) {
                 updateNotification("Microphone permission is required")
                 stopSelf()
                 return
             }
+            if (error == SpeechRecognizer.ERROR_CLIENT && processing) return
             retry()
         }
 
         override fun onResults(results: Bundle?) {
             listening = false
+            main.removeCallbacks(watchdog)
             destroyRecognizer()
-            val text = results
-                ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                ?.firstOrNull()
-                ?.trim()
-                .orEmpty()
+            val text = firstResult(results)
             if (text.isBlank()) {
-                retry()
+                if (armed) {
+                    speakThen("I'm listening.") { if (running) startListening() }
+                } else {
+                    retry()
+                }
                 return
             }
-            handleTranscript(text)
+            handleTranscript(text, final = true)
         }
 
         override fun onPartialResults(partialResults: Bundle?) {
-            val text = partialResults
-                ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                ?.firstOrNull()
-                ?.trim()
-                .orEmpty()
-            if (text.isNotBlank()) updateNotification(text.take(80))
+            val text = firstResult(partialResults)
+            if (text.isBlank()) return
+            updateNotification(text.take(90))
+            if (processing) return
+            if (settings.useWakeWord && !armed) {
+                val command = commandAfterWakeWord(text)
+                if (command != null && command.isBlank()) {
+                    armAndPrompt()
+                }
+            }
         }
 
         override fun onEvent(eventType: Int, params: Bundle?) = Unit
     }
 
-    private fun handleTranscript(text: String) {
+    private fun firstResult(bundle: Bundle?): String =
+        bundle?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+            ?.firstOrNull()
+            ?.trim()
+            .orEmpty()
+
+    private fun handleTranscript(text: String, final: Boolean) {
         if (!running) return
         if (settings.useWakeWord && !armed) {
-            val index = text.lowercase(Locale.US).indexOf(settings.wakeWord.lowercase(Locale.US))
-            if (index < 0) {
-                retry()
+            val command = commandAfterWakeWord(text) ?: run {
+                if (final) retry()
                 return
             }
-            val rest = text.substring(index + settings.wakeWord.length)
-                .trim(' ', ',', '.', '!', '?', ':')
-            if (rest.isBlank()) {
-                armed = true
-                TtsManager.speak("Yes, sir?") { startListening() }
+            if (command.isBlank()) {
+                armAndPrompt()
                 return
             }
             armed = false
-            process(rest)
+            process(command)
             return
         }
+        if (!final) return
         armed = false
-        process(text)
+        process(text.trim())
     }
 
+    private fun armAndPrompt() {
+        if (processing) return
+        armed = true
+        armedAt = SystemClock.elapsedRealtime()
+        ignoreRecognizerErrors = true
+        state = "armed"
+        destroyRecognizer()
+        main.removeCallbacks(watchdog)
+        updateNotification("Wake word heard. Listening…")
+        speakThen("Yes, sir?") { if (running) startListening() }
+    }
+
+    private fun commandAfterWakeWord(text: String): String? {
+        val words = normalize(text).split(' ').filter { it.isNotBlank() }
+        val wake = normalize(settings.wakeWord).split(' ').filter { it.isNotBlank() }
+        if (wake.isEmpty() || words.size < wake.size) return null
+        for (index in 0..(words.size - wake.size)) {
+            var match = true
+            for (offset in wake.indices) {
+                if (words[index + offset] != wake[offset]) {
+                    match = false
+                    break
+                }
+            }
+            if (match) {
+                return words.drop(index + wake.size).joinToString(" ")
+            }
+        }
+        return null
+    }
+
+    private fun normalize(value: String): String =
+        value.lowercase(Locale.US)
+            .replace(Regex("[^a-z0-9 ]"), " ")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+
     private fun process(command: String) {
+        if (command.isBlank()) {
+            retry()
+            return
+        }
         processing = true
+        state = "thinking"
+        armed = false
         TtsManager.stop()
         updateNotification("Thinking…")
         JarvisEngine.chat(command) { result ->
@@ -193,17 +278,36 @@ class VoiceService : Service() {
             } else {
                 "I ran into a problem: ${result.error ?: "unknown error"}"
             }
+            state = "speaking"
             updateNotification("Speaking…")
-            TtsManager.speak(response) {
+            speakThen(response) {
                 processing = false
-                if (running) main.postDelayed({ startListening() }, 350)
+                if (running) {
+                    main.postDelayed({ startListening() }, 300)
+                }
             }
         }
     }
 
+    private fun speakThen(text: String, next: () -> Unit) {
+        val finished = AtomicBoolean(false)
+        val action = {
+            if (finished.compareAndSet(false, true)) {
+                main.postDelayed(next, 180)
+            }
+        }
+        TtsManager.speak(text, action)
+        val timeout = (TTS_FALLBACK_MS + text.length * 70L).coerceAtMost(20_000L)
+        main.postDelayed({ action() }, timeout)
+    }
+
     private fun retry() {
         if (!running) return
-        main.postDelayed({ startListening() }, 700)
+        state = "retrying"
+        main.removeCallbacks(watchdog)
+        main.postDelayed({
+            if (running && !processing) startListening()
+        }, 650)
     }
 
     private fun destroyRecognizer() {
@@ -264,9 +368,16 @@ class VoiceService : Service() {
         const val ACTION_START = "com.jarvis.assistant.VOICE_START"
         const val ACTION_STOP = "com.jarvis.assistant.VOICE_STOP"
         private const val NOTIF_ID = 4242
+        private const val LISTEN_TIMEOUT_MS = 18_000L
+        private const val WAKE_WINDOW_MS = 15_000L
+        private const val TTS_FALLBACK_MS = 3_500L
 
         @Volatile
         var running: Boolean = false
+            private set
+
+        @Volatile
+        var state: String = "stopped"
             private set
 
         fun start(context: Context) {

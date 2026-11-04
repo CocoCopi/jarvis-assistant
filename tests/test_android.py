@@ -19,6 +19,10 @@ class AndroidToolTests(unittest.TestCase):
             "device_info",
             "android_shell",
             "android_ui",
+            "android_screen",
+            "android_node",
+            "android_gesture",
+            "android_text",
             "android_screenshot",
             "android_notifications",
             "android_apps",
@@ -60,7 +64,16 @@ class AndroidToolTests(unittest.TestCase):
             "create_skill",
         ):
             self.assertTrue(self.tools[name].requires_approval, name)
-        for name in ("android_ui", "android_screenshot", "android_files", "android_call"):
+        for name in (
+            "android_ui",
+            "android_screen",
+            "android_node",
+            "android_gesture",
+            "android_text",
+            "android_screenshot",
+            "android_files",
+            "android_call",
+        ):
             self.assertFalse(self.tools[name].requires_approval, name)
 
     def test_shell_passes_root_flag(self):
@@ -72,6 +85,19 @@ class AndroidToolTests(unittest.TestCase):
         with mock.patch.object(android_tools, "call", return_value="screen") as call:
             self.assertEqual(android_tools.ui("dump"), "screen")
         call.assert_called_once_with("uiDump")
+
+    def test_screen_state_uses_bridge(self):
+        with mock.patch.object(android_tools, "call", return_value="screen") as call:
+            self.assertEqual(android_tools.screen_state(True, False), "screen")
+        call.assert_called_once_with("screenState", True, False)
+
+    def test_node_actions_use_node_ids(self):
+        with mock.patch.object(android_tools, "call", return_value="clicked") as call:
+            self.assertEqual(android_tools.node_action("click", "node_4"), "clicked")
+        call.assert_called_once_with("clickNode", "node_4", False)
+        with mock.patch.object(android_tools, "call", return_value="typed") as call:
+            self.assertEqual(android_tools.text_input("append", "!", "node_7"), "typed")
+        call.assert_called_once_with("typeTextEx", "!", "append", "node_7")
 
     def test_update_applies_through_bridge(self):
         with mock.patch.object(android_tools, "call", return_value="updated") as call:

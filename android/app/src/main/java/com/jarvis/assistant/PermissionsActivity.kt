@@ -18,6 +18,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.NotificationManagerCompat
+import com.google.android.material.appbar.MaterialToolbar
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.card.MaterialCardView
 import com.jarvis.assistant.admin.JarvisDeviceAdminReceiver
 import com.jarvis.assistant.bridge.DeviceBridge
 
@@ -33,23 +36,43 @@ class PermissionsActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(20), dp(20), dp(24))
+            setBackgroundColor(getColor(R.color.jarvis_bg))
+            setPadding(dp(16), dp(4), dp(16), dp(24))
         }
         setContentView(ScrollView(this).apply { addView(root) })
 
         root.addView(
-            TextView(this).apply {
-                text = "ACCESS CONTROL"
-                textSize = 22f
-                setTextColor(getColor(R.color.jarvis_cyan))
+            MaterialToolbar(this).apply {
+                title = "Access control"
+                subtitle = "Grant Jarvis the whole phone"
+                setTitleTextColor(getColor(R.color.jarvis_cyan))
+                setSubtitleTextColor(getColor(R.color.jarvis_dim))
+                setBackgroundColor(getColor(R.color.jarvis_bg))
             },
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ),
         )
         status = TextView(this).apply {
             textSize = 12f
             setTextColor(getColor(R.color.jarvis_dim))
-            setPadding(0, dp(10), 0, dp(12))
+            setPadding(dp(14), dp(12), dp(14), dp(12))
         }
-        root.addView(status)
+        root.addView(
+            MaterialCardView(this).apply {
+                cardBackgroundColor = getColor(R.color.jarvis_surface)
+                radius = dp(18).toFloat()
+                strokeColor = getColor(R.color.jarvis_card_stroke)
+                strokeWidth = dp(1)
+                cardElevation = 0f
+                addView(status)
+            },
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply { topMargin = dp(8); bottomMargin = dp(8) },
+        )
 
         root.addView(
             button("GRANT RUNTIME PERMISSIONS") {
@@ -210,11 +233,11 @@ class PermissionsActivity : AppCompatActivity() {
     }
 
     private fun button(label: String, action: () -> Unit): Button {
-        return Button(this).apply {
+        return MaterialButton(this).apply {
             text = label
             setOnClickListener { action() }
-            setBackgroundColor(getColor(R.color.jarvis_surface))
             setTextColor(getColor(R.color.jarvis_cyan))
+            setBackgroundColor(getColor(R.color.jarvis_surface))
             textSize = 12f
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,

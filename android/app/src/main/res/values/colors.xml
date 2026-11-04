@@ -1,13 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="jarvis_bg">#05080D</color>
-    <color name="jarvis_surface">#0B1220</color>
-    <color name="jarvis_surface_2">#111D31</color>
-    <color name="jarvis_cyan">#39D0FF</color>
-    <color name="jarvis_cyan_dark">#0A84A8</color>
-    <color name="jarvis_text">#D8F3FF</color>
-    <color name="jarvis_dim">#6A8CA0</color>
-    <color name="jarvis_red">#FF5370</color>
-    <color name="jarvis_green">#4BFFB3</color>
+    <color name="jarvis_surface">#0C1422</color>
+    <color name="jarvis_surface_2">#142238</color>
+    <color name="jarvis_card">#101C2E</color>
+    <color name="jarvis_card_stroke">#1E3A52</color>
+    <color name="jarvis_cyan">#5CDBFF</color>
+    <color name="jarvis_cyan_dark">#0B7FA3</color>
+    <color name="jarvis_cyan_container">#00384A</color>
+    <color name="jarvis_text">#E4F7FF</color>
+    <color name="jarvis_dim">#8AA9BC</color>
+    <color name="jarvis_red">#FF6B81</color>
+    <color name="jarvis_green">#5CFFC0</color>
+    <color name="jarvis_amber">#FFD166</color>
     <color name="black">#000000</color>
 </resources>

@@ -24,6 +24,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import com.google.android.material.card.MaterialCardView
 import com.jarvis.assistant.engine.ChatResult
 import com.jarvis.assistant.engine.CodeUpdater
 import com.jarvis.assistant.engine.JarvisEngine
@@ -206,7 +207,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun refreshStatus() {
         val settings = SettingsStore.load(this)
-        status.text = "${settings.provider}:${settings.model}  |  ${JarvisEngine.statusText()}"
+        val voice = if (VoiceService.running) {
+            "voice:${VoiceService.state}"
+        } else {
+            "voice:off"
+        }
+        status.text = "${settings.provider}:${settings.model}  |  ${JarvisEngine.statusText()}  |  $voice"
     }
 
     fun appendTool(name: String, args: String) {
@@ -221,20 +227,43 @@ class MainActivity : AppCompatActivity() {
             "You" -> ContextCompat.getColor(this, R.color.jarvis_cyan)
             "Jarvis" -> ContextCompat.getColor(this, R.color.jarvis_text)
             "Error" -> ContextCompat.getColor(this, R.color.jarvis_red)
+            "Update" -> ContextCompat.getColor(this, R.color.jarvis_green)
             else -> ContextCompat.getColor(this, R.color.jarvis_dim)
         }
-        val view = TextView(this).apply {
-            text = if (who == "Tool") "[tool] ${message.take(4000)}" else "$who: ${message.take(20000)}"
-            setTextColor(if (dim) ContextCompat.getColor(this@MainActivity, R.color.jarvis_dim) else color)
-            textSize = 13.5f
-            setTextIsSelectable(true)
-            setPadding(0, dp(5), 0, dp(5))
+        val card = MaterialCardView(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                topMargin = dp(3)
+                bottomMargin = dp(3)
+            }
+            cardBackgroundColor = ContextCompat.getColor(
+                this@MainActivity,
+                if (dim) R.color.jarvis_surface else R.color.jarvis_card,
+            )
+            radius = dp(16).toFloat()
+            strokeColor = ContextCompat.getColor(this@MainActivity, R.color.jarvis_card_stroke)
+            strokeWidth = if (dim) 0 else dp(1)
+            cardElevation = 0f
+            setContentPadding(dp(12), dp(9), dp(12), dp(9))
+            addView(
+                TextView(this@MainActivity).apply {
+                    text = if (who == "Tool") {
+                        "[tool] ${message.take(4000)}"
+                    } else {
+                        "$who: ${message.take(20000)}"
+                    }
+                    setTextColor(
+                        if (dim) ContextCompat.getColor(this@MainActivity, R.color.jarvis_dim) else color,
+                    )
+                    textSize = if (dim) 12f else 13.5f
+                    setTextIsSelectable(true)
+                    setLineSpacing(0f, 1.08f)
+                },
             )
         }
-        chat.addView(view)
+        chat.addView(card)
         scroll.post { scroll.fullScroll(View.FOCUS_DOWN) }
     }
 
