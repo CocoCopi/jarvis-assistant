@@ -7,126 +7,182 @@
     android:background="@color/jarvis_bg"
     android:fitsSystemWindows="true">
 
+    <com.jarvis.assistant.ui.JarvisBackdropView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:paddingStart="14dp"
-        android:paddingTop="4dp"
-        android:paddingEnd="14dp"
-        android:paddingBottom="10dp">
+        android:paddingStart="18dp"
+        android:paddingTop="6dp"
+        android:paddingEnd="18dp"
+        android:paddingBottom="12dp">
 
-        <com.google.android.material.appbar.MaterialToolbar
-            android:id="@+id/toolbar"
-            android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize"
-            android:background="@android:color/transparent"
-            app:subtitle="MULTIMODAL ANDROID INTELLIGENCE"
-            app:subtitleTextColor="@color/jarvis_dim"
-            app:title="J.A.R.V.I.S."
-            app:titleTextColor="@color/jarvis_cyan"
-            app:titleTextAppearance="@style/TextAppearance.Material3.TitleLarge" />
-
-        <TextView
-            android:id="@+id/status"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:fontFamily="monospace"
-            android:paddingBottom="8dp"
-            android:text="initialising"
-            android:textColor="@color/jarvis_dim"
-            android:textSize="11sp" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
-        <com.google.android.material.card.MaterialCardView
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-light"
+                    android:letterSpacing="0.19"
+                    android:text="J.A.R.V.I.S."
+                    android:textColor="@color/jarvis_text"
+                    android:textSize="23sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="0dp"
+                    android:fontFamily="sans-serif-medium"
+                    android:letterSpacing="0.24"
+                    android:text="PERSONAL ANDROID INTELLIGENCE"
+                    android:textColor="@color/jarvis_cyan_dark"
+                    android:textSize="7.5sp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/access"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:focusable="true"
+                android:fontFamily="sans-serif-medium"
+                android:letterSpacing="0.12"
+                android:padding="8dp"
+                android:text="ACCESS"
+                android:textColor="@color/jarvis_dim"
+                android:textSize="9sp" />
+
+            <TextView
+                android:id="@+id/settings"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:focusable="true"
+                android:fontFamily="sans-serif-medium"
+                android:letterSpacing="0.12"
+                android:padding="8dp"
+                android:text="SETTINGS"
+                android:textColor="@color/jarvis_dim"
+                android:textSize="9sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/bg_status_pill"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="10dp"
+            android:paddingTop="5dp"
+            android:paddingEnd="12dp"
+            android:paddingBottom="5dp">
+
+            <View
+                android:id="@+id/status_dot"
+                android:layout_width="6dp"
+                android:layout_height="6dp"
+                android:background="@drawable/bg_dot" />
+
+            <TextView
+                android:id="@+id/status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="7dp"
+                android:fontFamily="monospace"
+                android:letterSpacing="0.06"
+                android:maxLines="1"
+                android:text="CORE OFFLINE"
+                android:textColor="@color/jarvis_dim"
+                android:textSize="9.5sp" />
+        </LinearLayout>
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="188dp"
+            android:layout_marginTop="2dp">
+
+            <com.jarvis.assistant.ui.JarvisOrbView
+                android:id="@+id/orb"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom|center_horizontal"
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
+                android:paddingBottom="4dp">
+
+                <TextView
+                    android:id="@+id/hero_title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-light"
+                    android:letterSpacing="0.22"
+                    android:text="STANDBY"
+                    android:textColor="@color/jarvis_text"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/hero_sub"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="1dp"
+                    android:fontFamily="sans-serif"
+                    android:maxWidth="300dp"
+                    android:maxLines="2"
+                    android:text="Say “Jarvis” or tap ENGAGE"
+                    android:textColor="@color/jarvis_dim"
+                    android:textSize="10sp" />
+            </LinearLayout>
+        </FrameLayout>
+
+        <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
+            android:layout_marginTop="2dp"
             android:layout_weight="1"
-            app:cardBackgroundColor="@color/jarvis_surface"
-            app:cardCornerRadius="22dp"
-            app:cardElevation="0dp"
-            app:strokeColor="@color/jarvis_card_stroke"
-            app:strokeWidth="1dp">
+            android:background="@drawable/bg_chat_shell"
+            android:padding="8dp">
 
             <ScrollView
                 android:id="@+id/scroll"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:clipToPadding="false"
-                android:padding="10dp"
-                android:scrollbars="vertical">
+                android:padding="4dp"
+                android:scrollbars="none">
 
                 <LinearLayout
                     android:id="@+id/chat"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:paddingBottom="8dp" />
+                    android:paddingBottom="6dp" />
             </ScrollView>
-        </com.google.android.material.card.MaterialCardView>
-
-        <com.google.android.material.textfield.TextInputLayout
-            android:id="@+id/input_layout"
-            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:hint="Ask Jarvis anything…"
-            app:boxBackgroundColor="@color/jarvis_surface"
-            app:boxCornerRadiusBottomEnd="16dp"
-            app:boxCornerRadiusBottomStart="16dp"
-            app:boxCornerRadiusTopEnd="16dp"
-            app:boxCornerRadiusTopStart="16dp"
-            app:boxStrokeColor="@color/jarvis_cyan"
-            app:hintTextColor="@color/jarvis_dim">
-
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/input"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:imeOptions="actionSend"
-                android:inputType="textCapSentences|textMultiLine"
-                android:maxLines="4"
-                android:padding="12dp"
-                android:textColor="@color/jarvis_text"
-                android:textColorHint="@color/jarvis_dim"
-                android:textSize="15sp" />
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/send"
-                style="@style/Widget.Material3.Button"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="SEND"
-                android:textColor="@color/black"
-                app:backgroundTint="@color/jarvis_cyan"
-                app:cornerRadius="16dp" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/talk"
-                style="@style/Widget.Material3.Button.OutlinedButton"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:layout_weight="1"
-                android:text="TALK"
-                android:textColor="@color/jarvis_cyan"
-                app:cornerRadius="16dp"
-                app:strokeColor="@color/jarvis_card_stroke" />
-        </LinearLayout>
+        </FrameLayout>
 
         <HorizontalScrollView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
+            android:layout_marginTop="8dp"
             android:clipToPadding="false"
             android:scrollbars="none">
 
@@ -135,46 +191,180 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal">
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/always"
-                    style="@style/Widget.Material3.Button.TextButton"
+                <TextView
+                    android:id="@+id/chip_screen"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="ALWAYS"
+                    android:background="@drawable/bg_chip"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:fontFamily="sans-serif-medium"
+                    android:letterSpacing="0.08"
+                    android:paddingStart="13dp"
+                    android:paddingTop="7dp"
+                    android:paddingEnd="13dp"
+                    android:paddingBottom="7dp"
+                    android:text="READ SCREEN"
                     android:textColor="@color/jarvis_cyan"
-                    android:textSize="11sp"
-                    app:cornerRadius="14dp" />
+                    android:textSize="9sp" />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/access"
-                    style="@style/Widget.Material3.Button.TextButton"
+                <TextView
+                    android:id="@+id/chip_notify"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="ACCESS"
+                    android:layout_marginStart="6dp"
+                    android:background="@drawable/bg_chip"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:fontFamily="sans-serif-medium"
+                    android:letterSpacing="0.08"
+                    android:paddingStart="13dp"
+                    android:paddingTop="7dp"
+                    android:paddingEnd="13dp"
+                    android:paddingBottom="7dp"
+                    android:text="NOTIFICATIONS"
                     android:textColor="@color/jarvis_cyan"
-                    android:textSize="11sp"
-                    app:cornerRadius="14dp" />
+                    android:textSize="9sp" />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/settings"
-                    style="@style/Widget.Material3.Button.TextButton"
+                <TextView
+                    android:id="@+id/chip_capture"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="SETTINGS"
+                    android:layout_marginStart="6dp"
+                    android:background="@drawable/bg_chip"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:fontFamily="sans-serif-medium"
+                    android:letterSpacing="0.08"
+                    android:paddingStart="13dp"
+                    android:paddingTop="7dp"
+                    android:paddingEnd="13dp"
+                    android:paddingBottom="7dp"
+                    android:text="CAPTURE"
                     android:textColor="@color/jarvis_cyan"
-                    android:textSize="11sp"
-                    app:cornerRadius="14dp" />
+                    android:textSize="9sp" />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/update"
-                    style="@style/Widget.Material3.Button.TextButton"
+                <TextView
+                    android:id="@+id/chip_lock"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="UPDATE"
+                    android:layout_marginStart="6dp"
+                    android:background="@drawable/bg_chip"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:fontFamily="sans-serif-medium"
+                    android:letterSpacing="0.08"
+                    android:paddingStart="13dp"
+                    android:paddingTop="7dp"
+                    android:paddingEnd="13dp"
+                    android:paddingBottom="7dp"
+                    android:text="LOCK"
                     android:textColor="@color/jarvis_cyan"
-                    android:textSize="11sp"
-                    app:cornerRadius="14dp" />
+                    android:textSize="9sp" />
+
+                <TextView
+                    android:id="@+id/chip_home"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:background="@drawable/bg_chip"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:fontFamily="sans-serif-medium"
+                    android:letterSpacing="0.08"
+                    android:paddingStart="13dp"
+                    android:paddingTop="7dp"
+                    android:paddingEnd="13dp"
+                    android:paddingBottom="7dp"
+                    android:text="HOME"
+                    android:textColor="@color/jarvis_cyan"
+                    android:textSize="9sp" />
             </LinearLayout>
         </HorizontalScrollView>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="7dp"
+            android:background="@drawable/bg_input_shell"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="5dp">
+
+            <EditText
+                android:id="@+id/input"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="@null"
+                android:hint="Command the core…"
+                android:imeOptions="actionSend"
+                android:inputType="textCapSentences|textMultiLine"
+                android:maxLines="4"
+                android:paddingStart="13dp"
+                android:paddingTop="9dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="9dp"
+                android:textColor="@color/jarvis_text"
+                android:textColorHint="@color/jarvis_dim"
+                android:textSize="14sp" />
+
+            <ImageButton
+                android:id="@+id/send"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:background="@drawable/bg_circle_accent"
+                android:contentDescription="Send"
+                android:padding="9dp"
+                android:src="@drawable/ic_send" />
+
+            <ImageButton
+                android:id="@+id/talk"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:layout_marginStart="6dp"
+                android:background="@drawable/bg_circle_outline"
+                android:contentDescription="Talk"
+                android:padding="10dp"
+                android:src="@drawable/ic_mic" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="7dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/always"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="0dp"
+                android:layout_height="46dp"
+                android:layout_weight="1"
+                android:fontFamily="sans-serif-medium"
+                android:letterSpacing="0.14"
+                android:text="ENGAGE"
+                android:textColor="@color/black"
+                android:textSize="10sp"
+                app:backgroundTint="@color/jarvis_cyan"
+                app:cornerRadius="23dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/update"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="46dp"
+                android:layout_marginStart="7dp"
+                android:fontFamily="sans-serif-medium"
+                android:letterSpacing="0.1"
+                android:text="SYNC"
+                android:textColor="@color/jarvis_cyan"
+                android:textSize="9sp"
+                app:backgroundTint="@color/jarvis_surface"
+                app:cornerRadius="23dp"
+                app:strokeColor="@color/jarvis_card_stroke"
+                app:strokeWidth="1dp" />
+        </LinearLayout>
     </LinearLayout>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

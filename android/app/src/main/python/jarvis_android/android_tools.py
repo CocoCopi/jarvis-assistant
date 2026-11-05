@@ -147,6 +147,8 @@ def apps(action: str = "list", package: str = "", query: str = "") -> str:
         return _result(call("launchApp", package))
     if action == "stop":
         return _result(call("stopApp", package))
+    if action in ("details", "detail", "info_text"):
+        return _result(call("appDetails", package))
     if action in ("info", "settings"):
         return _result(call("appInfo", package))
     return f"Unknown apps action: {action}"
@@ -160,17 +162,45 @@ def open_target(target: str) -> str:
     return _result(call("open", target))
 
 
-def files(action: str, path: str, content: str = "", max_chars: int = 20000) -> str:
+def files(action: str, path: str = "", content: str = "", max_chars: int = 20000,
+          find: str = "", replace: str = "", all: bool = True, url: str = "",
+          query: str = "") -> str:
     action = action.lower()
     if action == "read":
         return _result(call("fileRead", path, int(max_chars)))
     if action == "write":
         return _result(call("fileWrite", path, content))
+    if action == "append":
+        return _result(call("fileAppend", path, content))
+    if action == "replace":
+        return _result(call("fileReplace", path, find, replace, bool(all)))
     if action == "list":
         return _result(call("fileList", path))
+    if action == "search":
+        return _result(call("fileSearch", path, query))
+    if action == "storage":
+        return _result(call("storageLocations"))
+    if action == "download":
+        return _result(call("downloadUrl", url, path))
     if action == "delete":
         return _result(call("fileDelete", path))
     return f"Unknown files action: {action}"
+
+
+def device_settings(action: str, value: int = 0, text: str = "") -> str:
+    return _result(call("deviceSettings", action, int(value), text))
+
+
+def camera(action: str, path: str = "", camera_id: str = "", duration: int = 0) -> str:
+    return _result(call("camera", action, path, camera_id, int(duration)))
+
+
+def share(text: str = "", path: str = "", package: str = "") -> str:
+    return _result(call("share", text, path, package))
+
+
+def app_details(package: str) -> str:
+    return _result(call("appDetails", package))
 
 
 def clipboard(action: str, text: str = "") -> str:
@@ -388,6 +418,39 @@ def build_android_tools() -> list[Tool]:
             ["action"],
         ),
         _tool(
+            "android_settings",
+            "Read or change phone settings. Actions: status, brightness (value 0-100), rotation (text auto/portrait/landscape), timeout (value seconds), volume (value 0-100), flashlight (text on/off), dnd (text priority/alarms/none/all), wifi, internet, bluetooth, volume_panel, airplane, location, display, sound, battery, storage, date, language, developer. Toggles that Android forbids for apps open the exact system panel.",
+            {
+                "action": {"type": "string"},
+                "value": {"type": "integer"},
+                "text": {"type": "string"},
+            },
+            device_settings,
+            ["action"],
+        ),
+        _tool(
+            "android_camera",
+            "Use the camera: list cameras, photo (opens camera, saves JPEG to path), video (opens camera, saves MP4), or torch (path text on/off).",
+            {
+                "action": {"type": "string", "enum": ["list", "photo", "video", "torch"]},
+                "path": {"type": "string"},
+                "camera_id": {"type": "string"},
+                "duration": {"type": "integer"},
+            },
+            camera,
+            ["action"],
+        ),
+        _tool(
+            "android_share",
+            "Open the Android share sheet for text or a file. Provide text and/or path, optionally a target package.",
+            {
+                "text": {"type": "string"},
+                "path": {"type": "string"},
+                "package": {"type": "string"},
+            },
+            share,
+        ),
+        _tool(
             "android_screenshot",
             "Capture the current phone screen to a PNG and return the path. Set annotate=true to draw accessibility node IDs over the screen.",
             {"path": {"type": "string"}, "annotate": {"type": "boolean"}},
@@ -411,9 +474,9 @@ def build_android_tools() -> list[Tool]:
         ),
         _tool(
             "android_apps",
-            "List installed apps, launch an app by package name, or stop it. Use query to filter the list.",
+            "List installed apps, launch or stop an app, show package details, or open its system info. Use query to filter the list.",
             {
-                "action": {"type": "string", "enum": ["list", "launch", "stop", "info"]},
+                "action": {"type": "string", "enum": ["list", "launch", "stop", "details", "info"]},
                 "package": {"type": "string"},
                 "query": {"type": "string"},
             },
@@ -441,15 +504,20 @@ def build_android_tools() -> list[Tool]:
         ),
         _tool(
             "android_files",
-            "Read, write, list or delete files on the phone. Use absolute paths or ~ for the app external files directory. Grant all-files access for shared storage.",
+            "Read, write, append, replace, list, search, delete or download files on the phone. Use absolute paths or ~ for the app external files directory. Actions: read, write, append, replace (find/replace/all), list, search (path/query), storage, download (url/path), delete. Grant all-files access for shared storage.",
             {
-                "action": {"type": "string", "enum": ["read", "write", "list", "delete"]},
+                "action": {"type": "string", "enum": ["read", "write", "append", "replace", "list", "search", "storage", "download", "delete"]},
                 "path": {"type": "string"},
                 "content": {"type": "string"},
                 "max_chars": {"type": "integer"},
+                "find": {"type": "string"},
+                "replace": {"type": "string"},
+                "all": {"type": "boolean"},
+                "url": {"type": "string"},
+                "query": {"type": "string"},
             },
             files,
-            ["action", "path"],
+            ["action"],
         ),
         _tool(
             "android_clipboard",
@@ -460,7 +528,7 @@ def build_android_tools() -> list[Tool]:
         ),
         _tool(
             "android_media",
-            "Control media playback: play_pause, next, previous, stop, volume_up, volume_down, mute.",
+            "Control media playback and audio: play_pause, play, pause, next, previous, stop, volume_up, volume_down, mute. You can also set absolute volume through android_settings volume.",
             {"action": {"type": "string"}},
             media,
             ["action"],

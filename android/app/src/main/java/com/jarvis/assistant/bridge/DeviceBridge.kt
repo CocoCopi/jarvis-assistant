@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.hardware.camera2.CameraManager
 import android.location.LocationManager
 import android.media.AudioManager
 import android.net.Uri
@@ -16,6 +17,7 @@ import android.os.Bundle
 import android.os.Environment
 import android.os.StatFs
 import android.provider.ContactsContract
+import android.provider.MediaStore
 import android.provider.Settings
 import android.telephony.SmsManager
 import android.view.KeyEvent
@@ -32,8 +34,11 @@ import com.jarvis.assistant.services.JarvisAccessibilityService
 import com.jarvis.assistant.services.JarvisNotificationService
 import org.json.JSONObject
 import java.io.File
+import java.io.FileOutputStream
+import java.net.HttpURLConnection
 import java.net.Inet4Address
 import java.net.NetworkInterface
+import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.Collections
 import java.util.Date
@@ -45,6 +50,7 @@ import java.util.concurrent.TimeUnit
 object DeviceBridge {
     private val io = Executors.newCachedThreadPool()
     private val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.US)
+    private var torchOn = false
 
     private fun context(): Context = JarvisApp.instance.applicationContext
 
@@ -639,6 +645,341 @@ object DeviceBridge {
     }
 
     @JvmStatic
+    fun deviceSettings(action: String, value: Int, text: String): String = guarded {
+        val ctx = context()
+        val key = action.trim().lowercase(Locale.US)
+        when (key) {
+            "status", "get" -> {
+                val brightness = Settings.System.getInt(
+                    ctx.contentResolver,
+                    Settings.System.SCREEN_BRIGHTNESS,
+                    -1,
+                )
+                val mode = Settings.System.getInt(
+                    ctx.contentResolver,
+                    Settings.System.SCREEN_BRIGHTNESS_MODE,
+                    -1,
+                )
+                val rotation = Settings.System.getInt(
+                    ctx.contentResolver,
+                    Settings.System.ACCELEROMETER_ROTATION,
+                    1,
+                )
+                val timeout = Settings.System.getInt(
+                    ctx.contentResolver,
+                    Settings.System.SCREEN_OFF_TIMEOUT,
+                    0,
+                )
+                val audio = ctx.getSystemService(AudioManager::class.java)
+                val volume = audio.getStreamVolume(AudioManager.STREAM_MUSIC)
+                val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                val nm = ctx.getSystemService(android.app.NotificationManager::class.java)
+                "Brightness ${brightness}/255 (${if (mode == 1) "auto" else "manual"}). " +
+                    "Volume $volume/$max. Rotation ${if (rotation == 1) "auto" else "locked"}. " +
+                    "Screen timeout ${timeout / 1000}s. DND filter ${nm.currentInterruptionFilter}. " +
+                    "Torch ${if (torchOn) "on" else "off"}. Write settings: " +
+                    "${Settings.System.canWrite(ctx)}."
+            }
+            "brightness" -> {
+                if (!Settings.System.canWrite(ctx)) {
+                    return@guarded "Write Settings permission is not granted. Open Access and grant it."
+                }
+                val level = (value.coerceIn(0, 100) * 255 / 100)
+                Settings.System.putInt(
+                    ctx.contentResolver,
+                    Settings.System.SCREEN_BRIGHTNESS_MODE,
+                    Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL,
+                )
+                Settings.System.putInt(ctx.contentResolver, Settings.System.SCREEN_BRIGHTNESS, level)
+                "Brightness set to ${value.coerceIn(0, 100)}%."
+            }
+            "rotation" -> {
+                if (!Settings.System.canWrite(ctx)) {
+                    return@guarded "Write Settings permission is not granted. Open Access and grant it."
+                }
+                val wanted = text.lowercase(Locale.US)
+                when {
+                    wanted.startsWith("auto") -> {
+                        Settings.System.putInt(
+                            ctx.contentResolver,
+                            Settings.System.ACCELEROMETER_ROTATION,
+                            1,
+                        )
+                        "Rotation set to automatic."
+                    }
+                    else -> {
+                        Settings.System.putInt(
+                            ctx.contentResolver,
+                            Settings.System.ACCELEROMETER_ROTATION,
+                            0,
+                        )
+                        val rotation = when {
+                            wanted.startsWith("land") || wanted == "1" -> 1
+                            wanted.startsWith("port") || wanted == "0" -> 0
+                            else -> return@guarded "Use rotation auto, portrait or landscape."
+                        }
+                        Settings.System.putInt(
+                            ctx.contentResolver,
+                            "user_rotation",
+                            rotation,
+                        )
+                        "Rotation locked to ${if (rotation == 1) "landscape" else "portrait"}."
+                    }
+                }
+            }
+            "timeout" -> {
+                if (!Settings.System.canWrite(ctx)) {
+                    return@guarded "Write Settings permission is not granted. Open Access and grant it."
+                }
+                val seconds = value.coerceIn(15, 3600)
+                Settings.System.putInt(
+                    ctx.contentResolver,
+                    Settings.System.SCREEN_OFF_TIMEOUT,
+                    seconds * 1000,
+                )
+                "Screen timeout set to $seconds seconds."
+            }
+            "volume" -> {
+                val audio = ctx.getSystemService(AudioManager::class.java)
+                val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                val level = (value.coerceIn(0, 100) * max / 100)
+                audio.setStreamVolume(AudioManager.STREAM_MUSIC, level, AudioManager.FLAG_SHOW_UI)
+                "Media volume set to ${value.coerceIn(0, 100)}%."
+            }
+            "flashlight", "torch" -> {
+                val camera = ctx.getSystemService(CameraManager::class.java)
+                val id = camera.cameraIdList.firstOrNull()
+                    ?: return@guarded "No camera torch is available."
+                val on = when {
+                    text.contains("off", true) -> false
+                    text.contains("on", true) -> true
+                    value != 0 -> !torchOn
+                    else -> !torchOn
+                }
+                camera.setTorchMode(id, on)
+                torchOn = on
+                "Torch ${if (on) "on" else "off"}."
+            }
+            "dnd" -> {
+                val nm = ctx.getSystemService(android.app.NotificationManager::class.java)
+                if (nm.isNotificationPolicyAccessGranted) {
+                    val filter = when {
+                        text.contains("all", true) || text.contains("off", true) ->
+                            android.app.NotificationManager.INTERRUPTION_FILTER_ALL
+                        text.contains("alarm", true) ->
+                            android.app.NotificationManager.INTERRUPTION_FILTER_ALARMS
+                        text.contains("none", true) ->
+                            android.app.NotificationManager.INTERRUPTION_FILTER_NONE
+                        else -> android.app.NotificationManager.INTERRUPTION_FILTER_PRIORITY
+                    }
+                    nm.setInterruptionFilter(filter)
+                    "Do Not Disturb filter set."
+                } else {
+                    openSettings(ctx, Settings.ACTION_ZEN_MODE_ACCESS_SETTINGS)
+                    "Grant DND access in the screen that opened."
+                }
+            }
+            "wifi" -> openPanel(ctx, Settings.Panel.ACTION_WIFI)
+            "internet" -> openPanel(ctx, Settings.Panel.ACTION_INTERNET_CONNECTIVITY)
+            "bluetooth" -> openPanel(ctx, Settings.Panel.ACTION_BLUETOOTH)
+            "volume_panel" -> openPanel(ctx, Settings.Panel.ACTION_VOLUME)
+            "airplane" -> openSettings(ctx, Settings.ACTION_AIRPLANE_MODE_SETTINGS)
+            "location" -> openSettings(ctx, Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+            "display" -> openSettings(ctx, Settings.ACTION_DISPLAY_SETTINGS)
+            "sound" -> openSettings(ctx, Settings.ACTION_SOUND_SETTINGS)
+            "battery" -> openSettings(ctx, Settings.ACTION_BATTERY_SAVER_SETTINGS)
+            "storage" -> openSettings(ctx, Settings.ACTION_INTERNAL_STORAGE_SETTINGS)
+            "date" -> openSettings(ctx, Settings.ACTION_DATE_SETTINGS)
+            "language" -> openSettings(ctx, Settings.ACTION_LOCALE_SETTINGS)
+            "developer" -> openSettings(ctx, Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
+            else -> "Unknown settings action: $action"
+        }
+    }
+
+    @JvmStatic
+    fun camera(action: String, path: String, cameraId: String, duration: Int): String = guarded {
+        val ctx = context()
+        return when (action.trim().lowercase(Locale.US)) {
+            "list" -> {
+                val manager = ctx.getSystemService(CameraManager::class.java)
+                manager.cameraIdList.joinToString("\n") { id ->
+                    val c = manager.getCameraCharacteristics(id)
+                    val facing = c.get(android.hardware.camera2.CameraCharacteristics.LENS_FACING)
+                    val facingName = if (facing == android.hardware.camera2.CameraCharacteristics.LENS_FACING_FRONT) {
+                        "front"
+                    } else {
+                        "back"
+                    }
+                    "$id - $facingName"
+                }.ifBlank { "No cameras reported." }
+            }
+            "photo", "take_photo", "capture" -> {
+                val file = captureFile(ctx, path, "IMG", "jpg")
+                val uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.files", file)
+                val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+                    .putExtra(MediaStore.EXTRA_OUTPUT, uri)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    .addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                ctx.startActivity(intent)
+                "Camera opened. Photo will be saved to ${file.absolutePath}."
+            }
+            "video", "record" -> {
+                val file = captureFile(ctx, path, "VID", "mp4")
+                val uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.files", file)
+                val intent = Intent(MediaStore.ACTION_VIDEO_CAPTURE)
+                    .putExtra(MediaStore.EXTRA_OUTPUT, uri)
+                    .putExtra(MediaStore.EXTRA_VIDEO_QUALITY, 1)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    .addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                if (duration > 0) intent.putExtra(MediaStore.EXTRA_DURATION_LIMIT, duration)
+                ctx.startActivity(intent)
+                "Camera opened. Video will be saved to ${file.absolutePath}."
+            }
+            "torch" -> deviceSettings("flashlight", if (path.contains("off", true)) 0 else 1, path)
+            else -> "Unknown camera action: $action"
+        }
+    }
+
+    @JvmStatic
+    fun share(text: String, path: String, packageName: String): String = guarded {
+        val ctx = context()
+        val intent = if (path.isNotBlank()) {
+            val file = resolve(path)
+            if (!file.isFile) return@guarded "File not found: ${file.absolutePath}"
+            val uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.files", file)
+            Intent(Intent.ACTION_SEND).apply {
+                type = ctx.contentResolver.getType(uri) ?: "*/*"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                if (text.isNotBlank()) putExtra(Intent.EXTRA_TEXT, text)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        } else {
+            Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, text)
+            }
+        }
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (packageName.isNotBlank()) {
+            intent.setPackage(packageName)
+            ctx.startActivity(intent)
+        } else {
+            ctx.startActivity(Intent.createChooser(intent, "Share with").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
+        "Share sheet opened."
+    }
+
+    @JvmStatic
+    fun fileAppend(path: String, content: String): String = guarded {
+        val file = resolve(path)
+        file.parentFile?.mkdirs()
+        file.appendText(content)
+        "Appended ${content.length} characters to ${file.absolutePath}."
+    }
+
+    @JvmStatic
+    fun fileReplace(path: String, find: String, replace: String, all: Boolean): String = guarded {
+        if (find.isEmpty()) return@guarded "Nothing to replace."
+        val file = resolve(path)
+        if (!file.isFile) return@guarded "File not found: ${file.absolutePath}"
+        val text = file.readText()
+        val count = if (all) {
+            text.windowed(find.length, 1, true).count { it == find }
+        } else {
+            if (text.contains(find)) 1 else 0
+        }
+        val updated = if (all) text.replace(find, replace) else text.replaceFirst(find, replace)
+        file.writeText(updated)
+        "Replaced $count occurrence${if (count == 1) "" else "s"} in ${file.absolutePath}."
+    }
+
+    @JvmStatic
+    fun fileSearch(directory: String, query: String): String = guarded {
+        val root = resolve(directory)
+        if (!root.isDirectory) return@guarded "Not a directory: ${root.absolutePath}"
+        root.walkTopDown()
+            .maxDepth(7)
+            .filter { it.name.contains(query, true) }
+            .take(200)
+            .joinToString("\n") { it.absolutePath }
+            .ifBlank { "No files matched $query." }
+    }
+
+    @JvmStatic
+    fun storageLocations(): String = guarded {
+        val ctx = context()
+        listOf(
+            "internal files" to ctx.filesDir,
+            "internal cache" to ctx.cacheDir,
+            "external files" to (ctx.getExternalFilesDir(null) ?: File("/")),
+            "external cache" to (ctx.externalCacheDir ?: File("/")),
+            "shared storage" to Environment.getExternalStorageDirectory(),
+            "downloads" to Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+            "pictures" to Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
+            "movies" to Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES),
+            "documents" to Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS),
+        ).joinToString("\n") { (label, file) -> "$label: ${file.absolutePath}" }
+    }
+
+    @JvmStatic
+    fun downloadUrl(url: String, path: String): String = guarded {
+        val clean = url.trim()
+        if (!clean.startsWith("http://") && !clean.startsWith("https://")) {
+            return@guarded "Only http and https URLs are supported."
+        }
+        val target = resolve(path)
+        target.parentFile?.mkdirs()
+        val connection = (URL(clean).openConnection() as HttpURLConnection).apply {
+            connectTimeout = 20_000
+            readTimeout = 60_000
+            instanceFollowRedirects = true
+            setRequestProperty("User-Agent", "Jarvis-Android")
+        }
+        try {
+            val code = connection.responseCode
+            if (code !in 200..299) {
+                return@guarded "Download failed with HTTP $code."
+            }
+            val total = connection.contentLengthLong
+            val buffer = ByteArray(64 * 1024)
+            var written = 0L
+            connection.inputStream.use { input ->
+                FileOutputStream(target).use { output ->
+                    while (written < 250L * 1024 * 1024) {
+                        val read = input.read(buffer)
+                        if (read < 0) break
+                        output.write(buffer, 0, read)
+                        written += read
+                    }
+                }
+            }
+            "Downloaded ${written / 1024} KB to ${target.absolutePath}" +
+                if (total > 0) " (server size ${total / 1024} KB)." else "."
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    @JvmStatic
+    fun appDetails(packageName: String): String = guarded {
+        val ctx = context()
+        val pm = ctx.packageManager
+        val info = pm.getPackageInfo(
+            packageName,
+            PackageManager.GET_PERMISSIONS or PackageManager.GET_META_DATA,
+        )
+        val app = info.applicationInfo
+        val permissions = info.requestedPermissions?.joinToString(", ") ?: ""
+        "Package: $packageName\n" +
+            "Label: ${pm.getApplicationLabel(app)}\n" +
+            "Version: ${info.versionName ?: "?"} (${info.longVersionCode})\n" +
+            "Installed: ${Date(info.firstInstallTime)}\n" +
+            "Updated: ${Date(info.lastUpdateTime)}\n" +
+            "Enabled: ${app.enabled}\n" +
+            "Permissions: ${permissions.ifBlank { "none" }}"
+    }
+
+    @JvmStatic
     fun isRooted(): String = rootStatus()
 
     @JvmStatic
@@ -668,6 +1009,34 @@ object DeviceBridge {
         audio.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, code))
         audio.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, code))
         return "Media key sent."
+    }
+
+    private fun openSettings(ctx: Context, action: String): String {
+        ctx.startActivity(Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        return "Opened settings."
+    }
+
+    private fun openPanel(ctx: Context, action: String): String {
+        ctx.startActivity(Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        return "Opened panel."
+    }
+
+    private fun captureFile(ctx: Context, path: String, prefix: String, extension: String): File {
+        if (path.isNotBlank()) {
+            val requested = resolve(path)
+            requested.parentFile?.mkdirs()
+            return requested
+        }
+        val base = ctx.getExternalFilesDir(Environment.DIRECTORY_PICTURES)
+            ?: File(ctx.filesDir, "captures")
+        val directory = if (extension.equals("mp4", true)) {
+            ctx.getExternalFilesDir(Environment.DIRECTORY_MOVIES) ?: base
+        } else {
+            base
+        }
+        directory.mkdirs()
+        val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        return File(directory, "${prefix}_$stamp.$extension")
     }
 
     private fun resolve(path: String): File {

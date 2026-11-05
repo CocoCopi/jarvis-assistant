@@ -99,6 +99,25 @@ class AndroidToolTests(unittest.TestCase):
             self.assertEqual(android_tools.text_input("append", "!", "node_7"), "typed")
         call.assert_called_once_with("typeTextEx", "!", "append", "node_7")
 
+    def test_settings_and_camera_use_bridge(self):
+        with mock.patch.object(android_tools, "call", return_value="ok") as call:
+            android_tools.device_settings("brightness", 40, "")
+        call.assert_called_once_with("deviceSettings", "brightness", 40, "")
+        with mock.patch.object(android_tools, "call", return_value="ok") as call:
+            android_tools.camera("photo", "/tmp/a.jpg", "", 0)
+        call.assert_called_once_with("camera", "photo", "/tmp/a.jpg", "", 0)
+        with mock.patch.object(android_tools, "call", return_value="ok") as call:
+            android_tools.share("hello", "", "")
+        call.assert_called_once_with("share", "hello", "", "")
+
+    def test_extended_file_actions_use_bridge(self):
+        with mock.patch.object(android_tools, "call", return_value="ok") as call:
+            android_tools.files("replace", "/tmp/a", find="x", replace="y")
+        call.assert_called_once_with("fileReplace", "/tmp/a", "x", "y", True)
+        with mock.patch.object(android_tools, "call", return_value="ok") as call:
+            android_tools.files("download", "/tmp/a", url="https://example.com/a")
+        call.assert_called_once_with("downloadUrl", "https://example.com/a", "/tmp/a")
+
     def test_update_applies_through_bridge(self):
         with mock.patch.object(android_tools, "call", return_value="updated") as call:
             self.assertEqual(android_tools.update_source(), "updated")
