@@ -7,7 +7,7 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "android" / "app" / "src" / "main" / "python"))
 
-from jarvis_android import android_tools, bootstrap  # noqa: E402
+from jarvis_android import android_tools, bootstrap, engine  # noqa: E402
 
 
 class AndroidToolTests(unittest.TestCase):
@@ -135,6 +135,35 @@ class AndroidToolTests(unittest.TestCase):
         payload = [tool.spec() for tool in android_tools.build_android_tools()]
         self.assertIn("android_shell", {item["name"] for item in payload})
         json.dumps(payload)
+
+
+class FastPathTests(unittest.TestCase):
+    def test_time_and_date_are_local(self):
+        reply = engine._fast_reply("what time is it")
+        self.assertIsNotNone(reply)
+        self.assertIn(", sir.", reply)
+        self.assertIn("It is", reply)
+        self.assertIn("It is", engine._fast_reply("what is the date"))
+
+    def test_lock_uses_bridge(self):
+        with mock.patch.object(engine, "call", return_value="Locked.") as call:
+            reply = engine._fast_reply("lock the phone")
+        self.assertEqual(reply, "Locking the device, sir.")
+        call.assert_called_once_with("systemAction", "lock", 0)
+
+    def test_open_known_app_uses_first_match(self):
+        with mock.patch.object(engine, "call", side_effect=[
+            "com.example.camera - Camera",
+            "Launched com.example.camera.",
+        ]) as call:
+            reply = engine._fast_reply("open camera")
+        self.assertEqual(reply, "Opening Camera, sir.")
+        self.assertEqual(call.call_args_list[0], mock.call("apps", "camera"))
+        self.assertEqual(call.call_args_list[1], mock.call("launchApp", "com.example.camera"))
+
+    def test_unknown_commands_fall_through(self):
+        self.assertIsNone(engine._fast_reply("summarise this article"))
+        self.assertIsNone(engine._fast_reply("open the pod bay doors"))
 
 
 class BootstrapTests(unittest.TestCase):

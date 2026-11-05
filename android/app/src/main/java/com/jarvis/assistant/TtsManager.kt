@@ -20,9 +20,32 @@ object TtsManager {
         engine = TextToSpeech(context.applicationContext) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 ready = true
-                engine?.language = Locale.UK
-                engine?.setSpeechRate(0.97f)
-                engine?.setPitch(1.0f)
+                val tts = engine ?: return@TextToSpeech
+                val british = Locale.UK
+                try {
+                    tts.language = british
+                    val preferred = tts.voices
+                        ?.filter {
+                            it.locale.language == "en" &&
+                                it.locale.country == "GB" &&
+                                !it.isNetworkConnectionRequired
+                        }
+                        ?.sortedByDescending {
+                            val name = it.name.lowercase(Locale.US)
+                            when {
+                                name.contains("daniel") -> 4
+                                name.contains("ryan") -> 3
+                                name.contains("george") -> 2
+                                name.contains("british") -> 1
+                                else -> 0
+                            }
+                        }
+                        ?.firstOrNull()
+                    if (preferred != null) tts.voice = preferred
+                } catch (_: Throwable) {
+                }
+                tts.setSpeechRate(0.96f)
+                tts.setPitch(1.0f)
                 engine?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                     override fun onStart(utteranceId: String?) {}
                     override fun onDone(utteranceId: String?) {

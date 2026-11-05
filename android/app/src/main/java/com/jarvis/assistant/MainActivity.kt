@@ -4,12 +4,11 @@ import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Color
 import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.util.TypedValue
@@ -19,16 +18,16 @@ import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
-import android.widget.Space
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.PopupMenu
 import androidx.core.content.ContextCompat
-import com.google.android.material.button.MaterialButton
 import com.jarvis.assistant.engine.ChatResult
 import com.jarvis.assistant.engine.CodeUpdater
 import com.jarvis.assistant.engine.JarvisEngine
@@ -36,6 +35,7 @@ import com.jarvis.assistant.services.JarvisAccessibilityService
 import com.jarvis.assistant.services.VoiceService
 import com.jarvis.assistant.ui.JarvisOrbView
 import com.jarvis.assistant.ui.JarvisOverlay
+import java.util.Calendar
 import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
@@ -50,13 +50,31 @@ class MainActivity : AppCompatActivity() {
     private lateinit var orb: JarvisOrbView
     private lateinit var send: ImageButton
     private lateinit var talk: ImageButton
-    private lateinit var always: MaterialButton
+    private lateinit var always: TextView
+    private lateinit var menu: ImageButton
+
     private var autoUpdateStarted = false
+    private var activityLine: String? = null
+    private var pendingRow: View? = null
+    private var pendingBody: TextView? = null
+    private var thinkingFrame = 0
+
+    private val main = Handler(Looper.getMainLooper())
 
     private val ticker = object : Runnable {
         override fun run() {
             refreshStatus()
-            Handler(Looper.getMainLooper()).postDelayed(this, 800L)
+            main.postDelayed(this, 650L)
+        }
+    }
+
+    private val thinking = object : Runnable {
+        override fun run() {
+            val body = pendingBody ?: return
+            thinkingFrame += 1
+            body.text = "·".repeat((thinkingFrame % 3) + 1) + "  "
+            body.alpha = 0.45f + 0.2f * (thinkingFrame % 2)
+            main.postDelayed(this, 320L)
         }
     }
 
@@ -80,7 +98,7 @@ class MainActivity : AppCompatActivity() {
         if (grants[Manifest.permission.RECORD_AUDIO] == true) {
             startVoice()
         } else {
-            append("System", "Microphone permission is required for voice mode.")
+            appendSystem("Error", "Microphone permission is required for voice.")
         }
     }
 
@@ -100,32 +118,12 @@ class MainActivity : AppCompatActivity() {
         send = findViewById(R.id.send)
         talk = findViewById(R.id.talk)
         always = findViewById(R.id.always)
+        menu = findViewById(R.id.menu)
 
         send.setOnClickListener { submit() }
         talk.setOnClickListener { pushToTalk() }
         always.setOnClickListener { toggleAlwaysListening() }
-        findViewById<TextView>(R.id.access).setOnClickListener {
-            startActivity(Intent(this, PermissionsActivity::class.java))
-        }
-        findViewById<TextView>(R.id.settings).setOnClickListener {
-            startActivity(Intent(this, SettingsActivity::class.java))
-        }
-        findViewById<MaterialButton>(R.id.update).setOnClickListener { showUpdateDialog() }
-        findViewById<TextView>(R.id.chip_screen).setOnClickListener {
-            runCommand("Read my screen and tell me what is visible.")
-        }
-        findViewById<TextView>(R.id.chip_notify).setOnClickListener {
-            runCommand("List my notifications, then summarize the important ones.")
-        }
-        findViewById<TextView>(R.id.chip_capture).setOnClickListener {
-            runCommand("Take an annotated screenshot and tell me what is on screen.")
-        }
-        findViewById<TextView>(R.id.chip_lock).setOnClickListener {
-            runCommand("Lock the phone.")
-        }
-        findViewById<TextView>(R.id.chip_home).setOnClickListener {
-            runCommand("Press home.")
-        }
+        menu.setOnClickListener { showMenu(it) }
         input.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEND) {
                 submit()
@@ -135,11 +133,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        append(
-            "Jarvis",
-            "Core online. Accessibility, notifications, gestures, vision, shell, apps, " +
-                "settings and the island overlay are ready. Ask for anything.",
-        )
+        append("Jarvis", greeting())
         refreshStatus()
 
         JarvisEngine.init(applicationContext) {
@@ -152,18 +146,18 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         current = this
         refreshStatus()
-        always.text = if (VoiceService.running) "STOP" else "ENGAGE"
         if (VoiceService.running) JarvisOverlay.ensure(this)
-        Handler(Looper.getMainLooper()).removeCallbacks(ticker)
-        Handler(Looper.getMainLooper()).post(ticker)
+        main.removeCallbacks(ticker)
+        main.post(ticker)
     }
 
     override fun onPause() {
-        Handler(Looper.getMainLooper()).removeCallbacks(ticker)
+        main.removeCallbacks(ticker)
         super.onPause()
     }
 
     override fun onDestroy() {
+        main.removeCallbacksAndMessages(null)
         if (current === this) current = null
         super.onDestroy()
     }
@@ -176,40 +170,42 @@ class MainActivity : AppCompatActivity() {
         runChat(text)
     }
 
-    private fun runCommand(command: String) {
-        append("You", command)
-        runChat(command)
-    }
-
     private fun runChat(text: String) {
         setBusy(true)
+        activityLine = "Consulting the core"
+        showThinking()
         JarvisOverlay.ensure(this)
-        JarvisOverlay.update("thinking", "Thinking…")
+        JarvisOverlay.update("thinking", "One moment, sir…")
+        val started = SystemClock.elapsedRealtime()
         JarvisEngine.chat(text) { result ->
             setBusy(false)
-            showResult(result)
+            activityLine = null
+            clearThinking()
+            showResult(result, SystemClock.elapsedRealtime() - started)
             if (!VoiceService.running) JarvisOverlay.detach()
         }
     }
 
-    private fun showResult(result: ChatResult) {
+    private fun showResult(result: ChatResult, elapsedMs: Long) {
         if (result.ok) {
             if (result.reply.isNotBlank()) append("Jarvis", result.reply)
         } else {
-            append("Error", result.error ?: "Unknown error")
+            appendSystem("Error", result.error ?: "Unknown error")
         }
+        if (elapsedMs < 600 && result.ok) heroSub.text = "At your service, sir."
         refreshStatus()
     }
 
     private fun setBusy(busy: Boolean) {
         send.isEnabled = !busy
         talk.isEnabled = !busy
-        input.isEnabled = !busy
+        send.alpha = if (busy) 0.35f else 1f
+        talk.alpha = if (busy) 0.35f else 1f
     }
 
     private fun pushToTalk() {
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-            Toast.makeText(this, "No speech recognizer is installed.", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "No speech recogniser is installed.", Toast.LENGTH_LONG).show()
             return
         }
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
@@ -232,8 +228,8 @@ class MainActivity : AppCompatActivity() {
     private fun toggleAlwaysListening() {
         if (VoiceService.running) {
             VoiceService.stop(this)
-            always.text = "ENGAGE"
-            append("System", "Always-listening stopped.")
+            always.text = "◉  LISTEN"
+            appendSystem("System", "Standing by.")
             return
         }
         val mic = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
@@ -252,29 +248,52 @@ class MainActivity : AppCompatActivity() {
     private fun startVoice() {
         try {
             VoiceService.start(this)
-            always.text = "STOP"
+            always.text = "◼  STOP"
             JarvisOverlay.ensure(this)
-            append("System", "Listening. Say \"${SettingsStore.load(this).wakeWord}\", " +
-                "then keep talking without repeating it.")
             if (!android.provider.Settings.canDrawOverlays(this) &&
                 JarvisAccessibilityService.instance == null
             ) {
-                append(
+                appendSystem(
                     "System",
-                    "For the floating island, enable Accessibility or Display over other apps in ACCESS.",
+                    "For the floating island, enable Accessibility or overlays in the menu.",
                 )
             }
         } catch (e: Throwable) {
-            append("Error", "Could not start voice service: ${e.message}")
+            appendSystem("Error", "Could not start voice: ${e.message}")
         }
     }
 
+    private fun showMenu(anchor: View) {
+        val popup = PopupMenu(this, anchor)
+        popup.menu.add(0, 1, 0, "Access")
+        popup.menu.add(0, 2, 1, "Settings")
+        popup.menu.add(0, 3, 2, "Sync code")
+        popup.menu.add(0, 4, 3, "Install APK")
+        popup.menu.add(0, 5, 4, "Clear conversation")
+        popup.setOnMenuItemClickListener { item ->
+            when (item.itemId) {
+                1 -> startActivity(Intent(this, PermissionsActivity::class.java))
+                2 -> startActivity(Intent(this, SettingsActivity::class.java))
+                3 -> syncCode()
+                4 -> installApk()
+                5 -> clearConversation()
+            }
+            true
+        }
+        popup.show()
+    }
+
+    private fun clearConversation() {
+        JarvisEngine.reset { }
+        chat.removeAllViews()
+        append("Jarvis", greeting())
+    }
+
     private fun refreshStatus() {
-        val settings = SettingsStore.load(this)
         val running = VoiceService.running
         val state = VoiceService.state
         val label = when {
-            !running -> "CORE STANDBY"
+            !running -> "STANDBY"
             state.contains("wake", true) -> "AWAITING WAKE WORD"
             state.contains("listen", true) || state.contains("hear", true) -> "LISTENING"
             state.contains("think", true) || state.contains("process", true) -> "REASONING"
@@ -282,56 +301,90 @@ class MainActivity : AppCompatActivity() {
             state.contains("arm", true) -> "ENGAGED"
             else -> state.uppercase(Locale.US)
         }
-        status.text = "$label  ·  ${settings.provider}:${settings.model.take(18)}"
-        statusDot.alpha = if (running) 1f else 0.35f
+        status.text = label
+        statusDot.alpha = if (running) 1f else 0.4f
         orb.setMode(if (running) state else "idle")
         heroTitle.text = when {
             !running -> "STANDBY"
             state.contains("wake", true) -> "WAKE WORD"
-            state.contains("think", true) || state.contains("process", true) -> "THINKING"
+            state.contains("think", true) || state.contains("process", true) -> "REASONING"
             state.contains("speak", true) -> "SPEAKING"
             state.contains("listen", true) || state.contains("hear", true) -> "LISTENING"
             else -> "ENGAGED"
         }
-        heroSub.text = if (running) {
-            VoiceService.detail.ifBlank { "Listening continuously. No wake word needed now." }
+        heroSub.text = activityLine ?: if (running) {
+            VoiceService.detail.ifBlank { "Listening, sir." }
         } else {
-            "Say “Jarvis” or tap ENGAGE"
+            "At your service, sir."
         }
-        always.text = if (running) "STOP" else "ENGAGE"
+        always.text = if (running) "◼  STOP" else "◉  LISTEN"
     }
 
     fun appendTool(name: String, args: String) {
         runOnUiThread {
-            val clean = args.replace("\n", " ").take(320)
-            append("Tool", "$name $clean", dim = true)
+            val clean = name.replace('_', ' ')
+            activityLine = "Using $clean"
             JarvisOverlay.ensure(this)
-            JarvisOverlay.update("thinking", "Tool · ${name.replace('_', ' ')}")
+            JarvisOverlay.update("thinking", "Using $clean")
         }
     }
 
-    private fun append(who: String, message: String, dim: Boolean = false) {
+    private fun showThinking() {
+        clearThinking()
+        thinkingFrame = 0
+        val row = messageShell("J.A.R.V.I.S.", "", user = false, thinking = true)
+        val body = row.getChildAt(1) as TextView
+        pendingRow = row
+        pendingBody = body
+        row.alpha = 0f
+        chat.addView(row)
+        row.animate().alpha(1f).setDuration(160L).start()
+        scrollDown()
+        main.post(thinking)
+    }
+
+    private fun clearThinking() {
+        main.removeCallbacks(thinking)
+        pendingRow?.let { chat.removeView(it) }
+        pendingRow = null
+        pendingBody = null
+    }
+
+    private fun append(who: String, message: String) {
         if (who == "Tool" || who == "System" || who == "Update" || who == "Error") {
-            appendSystem(who, message, dim)
+            appendSystem(who, message)
             return
         }
-        val isUser = who == "You"
+        val row = messageShell(
+            if (who == "You") "YOU" else "J.A.R.V.I.S.",
+            message,
+            user = who == "You",
+            thinking = false,
+        )
+        row.alpha = 0f
+        chat.addView(row)
+        row.animate().alpha(1f).setDuration(200L).start()
+        scrollDown()
+    }
+
+    private fun messageShell(
+        label: String,
+        message: String,
+        user: Boolean,
+        thinking: Boolean,
+    ): LinearLayout {
         val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = if (isUser) Gravity.END else Gravity.START
-            setPadding(0, dp(4), 0, dp(4))
-        }
-        val bubble = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            background = bubbleBackground(isUser)
-            setPadding(dp(13), dp(9), dp(13), dp(10))
+            setPadding(0, dp(13), 0, dp(13))
         }
-        val name = TextView(this).apply {
-            text = if (isUser) "YOU" else "J.A.R.V.I.S."
-            letterSpacing = 0.14f
+        val marker = TextView(this).apply {
+            text = label
+            letterSpacing = 0.22f
             setTextColor(
-                if (isUser) ContextCompat.getColor(this@MainActivity, R.color.jarvis_cyan_dark)
-                else ContextCompat.getColor(this@MainActivity, R.color.jarvis_cyan),
+                ContextCompat.getColor(
+                    this@MainActivity,
+                    if (user) R.color.jarvis_dim else R.color.jarvis_cyan_dark,
+                ),
             )
             textSize = 8f
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
@@ -339,117 +392,113 @@ class MainActivity : AppCompatActivity() {
         val body = TextView(this).apply {
             text = message.take(20000)
             setTextColor(
-                if (dim) ContextCompat.getColor(this@MainActivity, R.color.jarvis_dim)
-                else ContextCompat.getColor(this@MainActivity, R.color.jarvis_text),
+                ContextCompat.getColor(
+                    this@MainActivity,
+                    if (user) R.color.jarvis_cyan_dark else R.color.jarvis_text,
+                ),
             )
-            textSize = 13.5f
-            setTextIsSelectable(true)
-            setLineSpacing(0f, 1.1f)
-            maxWidth = (resources.displayMetrics.widthPixels * 0.78f).toInt()
+            textSize = if (user) 14f else 15f
+            setTextIsSelectable(!thinking)
+            setLineSpacing(dp(3).toFloat(), 1.12f)
+            maxWidth = (resources.displayMetrics.widthPixels * 0.9f).toInt()
+            if (user) typeface = Typeface.create("sans-serif", Typeface.NORMAL)
         }
-        bubble.addView(name)
-        bubble.addView(body)
-        if (isUser) {
-            row.addView(avatar("Y", true))
-            row.addView(bubble, LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { marginEnd = dp(7) })
-        } else {
-            row.addView(avatar("J", false))
-            row.addView(bubble, LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { marginStart = dp(7) })
-            row.addView(Space(this), LinearLayout.LayoutParams(0, 1, 1f))
-        }
-        chat.addView(row)
-        scroll.post { scroll.fullScroll(View.FOCUS_DOWN) }
+        row.addView(marker)
+        row.addView(body, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+        ).apply { topMargin = dp(4) })
+        return row
     }
 
-    private fun appendSystem(who: String, message: String, dim: Boolean) {
-        val chip = TextView(this).apply {
-            text = if (who == "Tool") "◈ ${message.take(4000)}" else "$who · ${message.take(20000)}"
+    private fun appendSystem(who: String, message: String) {
+        val text = TextView(this).apply {
+            this.text = message.take(20000)
+            gravity = Gravity.CENTER
             setTextColor(
-                when (who) {
-                    "Error" -> ContextCompat.getColor(this@MainActivity, R.color.jarvis_red)
-                    "Update" -> ContextCompat.getColor(this@MainActivity, R.color.jarvis_green)
-                    else -> ContextCompat.getColor(this@MainActivity, R.color.jarvis_dim)
-                },
+                ContextCompat.getColor(
+                    this@MainActivity,
+                    when (who) {
+                        "Error" -> R.color.jarvis_red
+                        "Update" -> R.color.jarvis_green
+                        else -> R.color.jarvis_dim
+                    },
+                ),
             )
-            textSize = if (who == "Tool") 10f else 11f
-            typeface = if (who == "Tool") Typeface.MONOSPACE else Typeface.DEFAULT
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.RECTANGLE
-                cornerRadius = dp(14).toFloat()
-                setColor(Color.argb(if (dim) 110 else 170, 12, 24, 38))
-                setStroke(dp(1), Color.argb(90, 40, 92, 118))
-            }
-            setPadding(dp(11), dp(7), dp(11), dp(7))
+            textSize = 10f
+            letterSpacing = 0.04f
+            setPadding(dp(8), dp(7), dp(8), dp(7))
         }
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(0, dp(3), 0, dp(3))
+            setPadding(0, dp(2), 0, dp(2))
         }
-        row.addView(chip)
+        row.addView(text)
         chat.addView(row)
+        scrollDown()
+    }
+
+    private fun scrollDown() {
         scroll.post { scroll.fullScroll(View.FOCUS_DOWN) }
     }
 
-    private fun avatar(letter: String, user: Boolean): TextView {
-        return TextView(this).apply {
-            text = letter
-            gravity = Gravity.CENTER
-            setTextColor(
-                if (user) ContextCompat.getColor(this@MainActivity, R.color.black)
-                else ContextCompat.getColor(this@MainActivity, R.color.jarvis_cyan),
-            )
-            textSize = 10f
-            typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                if (user) {
-                    setColor(ContextCompat.getColor(this@MainActivity, R.color.jarvis_cyan))
-                } else {
-                    setColor(Color.rgb(11, 25, 38))
-                    setStroke(dp(1), ContextCompat.getColor(this@MainActivity, R.color.jarvis_cyan_dark))
-                }
-            }
-            val size = dp(26)
-            layoutParams = LinearLayout.LayoutParams(size, size).apply {
-                gravity = Gravity.BOTTOM
-                topMargin = dp(2)
-            }
+    private fun greeting(): String {
+        val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+        val part = when {
+            hour < 12 -> "Good morning"
+            hour < 18 -> "Good afternoon"
+            else -> "Good evening"
         }
+        return "$part, sir."
     }
 
-    private fun bubbleBackground(user: Boolean): GradientDrawable {
-        return GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            cornerRadii = if (user) {
-                floatArrayOf(
-                    dp(18).toFloat(), dp(18).toFloat(),
-                    dp(18).toFloat(), dp(18).toFloat(),
-                    dp(4).toFloat(), dp(4).toFloat(),
-                    dp(18).toFloat(), dp(18).toFloat(),
-                )
-            } else {
-                floatArrayOf(
-                    dp(18).toFloat(), dp(18).toFloat(),
-                    dp(18).toFloat(), dp(18).toFloat(),
-                    dp(18).toFloat(), dp(18).toFloat(),
-                    dp(4).toFloat(), dp(4).toFloat(),
-                )
-            }
-            if (user) {
-                setColor(Color.rgb(8, 42, 56))
-                setStroke(dp(1), Color.rgb(26, 93, 116))
-            } else {
-                setColor(Color.rgb(12, 23, 36))
-                setStroke(dp(1), Color.rgb(27, 56, 78))
-            }
+    private fun syncCode() {
+        val settings = SettingsStore.load(this)
+        if (settings.repo.isBlank()) {
+            AlertDialog.Builder(this)
+                .setTitle("No repository")
+                .setMessage("Set owner/repo in Settings first.")
+                .setPositiveButton("Settings") { _, _ ->
+                    startActivity(Intent(this, SettingsActivity::class.java))
+                }
+                .setNegativeButton("Close", null)
+                .show()
+            return
         }
+        activityLine = "Synchronising source"
+        appendSystem("Update", "Checking ${settings.repo}…")
+        Thread {
+            val message = CodeUpdater.checkForCode(applicationContext, settings.repo)
+            runOnUiThread { appendSystem("Update", message) }
+            if (message.contains("Downloaded")) {
+                JarvisEngine.reload {
+                    runOnUiThread {
+                        activityLine = null
+                        appendSystem("Update", "Applied ${JarvisEngine.statusText()}")
+                        refreshStatus()
+                    }
+                }
+            } else {
+                runOnUiThread { activityLine = null }
+            }
+        }.start()
+    }
+
+    private fun installApk() {
+        val repo = SettingsStore.load(this).repo
+        if (repo.isBlank()) {
+            appendSystem("Error", "Set owner/repo in Settings first.")
+            return
+        }
+        activityLine = "Checking for a new build"
+        Thread {
+            val message = CodeUpdater.installApkUpdate(applicationContext, repo)
+            runOnUiThread {
+                activityLine = null
+                appendSystem("Update", message)
+            }
+        }.start()
     }
 
     private fun maybeAutoUpdate() {
@@ -460,62 +509,14 @@ class MainActivity : AppCompatActivity() {
         Thread {
             val message = CodeUpdater.checkForCode(applicationContext, settings.repo)
             if (message.contains("Downloaded")) {
-                runOnUiThread { append("Update", message) }
+                runOnUiThread { appendSystem("Update", message) }
                 JarvisEngine.reload {
                     runOnUiThread {
-                        append("Update", "Applied ${JarvisEngine.statusText()}")
+                        appendSystem("Update", "Applied ${JarvisEngine.statusText()}")
                         refreshStatus()
                     }
                 }
             }
-        }.start()
-    }
-
-    private fun showUpdateDialog() {
-        val settings = SettingsStore.load(this)
-        if (settings.repo.isBlank()) {
-            AlertDialog.Builder(this)
-                .setTitle("GitHub repo missing")
-                .setMessage(
-                    "Set owner/repo in Settings. The CI build normally bakes this in automatically.",
-                )
-                .setPositiveButton("Settings") { _, _ ->
-                    startActivity(Intent(this, SettingsActivity::class.java))
-                }
-                .setNegativeButton("Close", null)
-                .show()
-            return
-        }
-        AlertDialog.Builder(this)
-            .setTitle("Update Jarvis")
-            .setMessage("Repo: ${settings.repo}")
-            .setPositiveButton("Code") { _, _ -> updateCode(settings.repo) }
-            .setNeutralButton("APK") { _, _ -> updateApk(settings.repo) }
-            .setNegativeButton("Cancel", null)
-            .show()
-    }
-
-    private fun updateCode(repo: String) {
-        append("Update", "Checking $repo for new code…")
-        Thread {
-            val message = CodeUpdater.checkForCode(applicationContext, repo)
-            runOnUiThread { append("Update", message) }
-            if (message.contains("Downloaded")) {
-                JarvisEngine.reload {
-                    runOnUiThread {
-                        append("Update", "Applied ${JarvisEngine.statusText()}")
-                        refreshStatus()
-                    }
-                }
-            }
-        }.start()
-    }
-
-    private fun updateApk(repo: String) {
-        append("Update", "Checking $repo for a new APK…")
-        Thread {
-            val message = CodeUpdater.installApkUpdate(applicationContext, repo)
-            runOnUiThread { append("Update", message) }
         }.start()
     }
 

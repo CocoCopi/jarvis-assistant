@@ -4,10 +4,8 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.RectF
-import android.graphics.Shader
 import android.graphics.Typeface
 import android.os.Handler
 import android.os.Looper
@@ -18,6 +16,7 @@ import android.view.View
 import android.view.WindowManager
 import com.jarvis.assistant.MainActivity
 import com.jarvis.assistant.services.JarvisAccessibilityService
+import kotlin.math.sin
 
 object JarvisOverlay {
     private val main = Handler(Looper.getMainLooper())
@@ -25,7 +24,7 @@ object JarvisOverlay {
     private var manager: WindowManager? = null
     private var host: Context? = null
     private var lastState = "idle"
-    private var lastDetail = "Standing by"
+    private var lastDetail = "At your service, sir."
 
     fun attach(context: Context) {
         main.post { attachNow(context.applicationContext) }
@@ -33,13 +32,13 @@ object JarvisOverlay {
 
     fun update(state: String, detail: String) {
         lastState = state
-        lastDetail = detail.ifBlank { "Standing by" }
+        lastDetail = detail.ifBlank { "At your service, sir." }
         main.post {
             val current = view
             if (current == null) {
                 attachNow(com.jarvis.assistant.JarvisApp.instance.applicationContext)
             }
-            current?.render(lastState, lastDetail)
+            (view ?: current)?.render(lastState, lastDetail)
         }
     }
 
@@ -98,13 +97,13 @@ object JarvisOverlay {
             manager = wm
             host = hostContext
             island.alpha = 0f
-            island.scaleX = 0.82f
-            island.scaleY = 0.82f
+            island.scaleX = 0.86f
+            island.scaleY = 0.86f
             island.animate()
                 .alpha(1f)
                 .scaleX(1f)
                 .scaleY(1f)
-                .setDuration(260L)
+                .setDuration(220L)
                 .start()
         } catch (_: Throwable) {
             view = null
@@ -129,29 +128,27 @@ object JarvisOverlay {
         (value * context.resources.displayMetrics.density).toInt()
 
     private class IslandView(context: Context) : View(context) {
-        private val backgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-        private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-        private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        private val paper = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val border = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
             strokeWidth = dp(1f)
         }
         private val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-            textSize = sp(8.5f)
+            textSize = sp(7.5f)
         }
         private val detailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             typeface = Typeface.create("sans-serif", Typeface.NORMAL)
-            textSize = sp(12.5f)
+            textSize = sp(12f)
         }
         private val barPaint = Paint(Paint.ANTI_ALIAS_FLAG)
         private val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG)
         private val rect = RectF()
         private var label = "J A R V I S"
-        private var detail = "Standing by"
+        private var detail = "At your service, sir."
         private var mode = "idle"
-        private var accent = Color.rgb(92, 219, 255)
+        private var accent = Color.rgb(23, 107, 135)
         private var active = false
-        private var pulseAt = SystemClock.uptimeMillis()
 
         init {
             isClickable = true
@@ -161,13 +158,13 @@ object JarvisOverlay {
 
         fun render(state: String, text: String) {
             mode = state.lowercase()
-            detail = text.replace('\n', ' ').take(70).ifBlank { "Standing by" }
+            detail = text.replace('\n', ' ').take(70).ifBlank { "At your service, sir." }
             accent = when {
-                mode.contains("think") || mode.contains("process") -> Color.rgb(255, 209, 102)
-                mode.contains("speak") -> Color.rgb(92, 255, 192)
-                mode.contains("wait") || mode.contains("stand") -> Color.rgb(138, 169, 188)
-                mode.contains("error") || mode.contains("unavailable") -> Color.rgb(255, 107, 129)
-                else -> Color.rgb(92, 219, 255)
+                mode.contains("think") || mode.contains("process") -> Color.rgb(169, 113, 66)
+                mode.contains("speak") -> Color.rgb(46, 107, 85)
+                mode.contains("wait") || mode.contains("stand") -> Color.rgb(112, 118, 122)
+                mode.contains("error") || mode.contains("unavailable") -> Color.rgb(163, 58, 49)
+                else -> Color.rgb(23, 107, 135)
             }
             active = mode.contains("listen") || mode.contains("hear") ||
                 mode.contains("think") || mode.contains("process") || mode.contains("speak") ||
@@ -179,9 +176,9 @@ object JarvisOverlay {
         override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
             val detailWidth = detailPaint.measureText(detail).toInt()
             val labelWidth = labelPaint.measureText(label).toInt()
-            val desired = maxOf(dp(200f).toInt(), maxOf(detailWidth, labelWidth) + dp(86f).toInt())
+            val desired = maxOf(dp(196f).toInt(), maxOf(detailWidth, labelWidth) + dp(82f).toInt())
             val max = (resources.displayMetrics.widthPixels * 0.88f).toInt()
-            setMeasuredDimension(minOf(desired, max), dp(52f).toInt())
+            setMeasuredDimension(minOf(desired, max), dp(48f).toInt())
         }
 
         override fun onDraw(canvas: Canvas) {
@@ -192,67 +189,46 @@ object JarvisOverlay {
             val radius = h / 2f
             rect.set(dp(2f), dp(2f), w - dp(2f), h - dp(2f))
 
-            if (active) {
-                val pulse = (0.45f + 0.35f * kotlin.math.sin((now / 360f).toDouble()).toFloat())
-                glowPaint.color = withAlpha(accent, (90 * pulse).toInt())
-                glowPaint.setShadowLayer(dp(18f), 0f, 0f, withAlpha(accent, 180))
-                canvas.drawRoundRect(rect, radius, radius, glowPaint)
-                glowPaint.clearShadowLayer()
-            }
+            paper.color = Color.rgb(251, 250, 246)
+            paper.setShadowLayer(dp(12f), 0f, dp(3f), Color.argb(34, 0, 0, 0))
+            canvas.drawRoundRect(rect, radius, radius, paper)
+            paper.clearShadowLayer()
+            paper.color = Color.rgb(251, 250, 246)
+            canvas.drawRoundRect(rect, radius, radius, paper)
 
-            backgroundPaint.shader = LinearGradient(
-                0f,
-                0f,
-                w,
-                h,
-                Color.argb(250, 10, 15, 21),
-                Color.argb(250, 4, 7, 11),
-                Shader.TileMode.CLAMP,
-            )
-            canvas.drawRoundRect(rect, radius, radius, backgroundPaint)
-            strokePaint.color = withAlpha(accent, 130)
-            canvas.drawRoundRect(rect, radius, radius, strokePaint)
+            border.color = if (active) withAlpha(accent, 120) else Color.argb(52, 24, 27, 29)
+            canvas.drawRoundRect(rect, radius, radius, border)
 
-            val dotPulse = if (active) {
-                3.8f + 1.4f * kotlin.math.sin((now / 260f).toDouble()).toFloat()
-            } else {
-                3.6f
-            }
-            dotPaint.color = accent
-            canvas.drawCircle(dp(19f), h / 2f, dp(dotPulse), dotPaint)
+            val pulse = if (active) 0.5f + 0.5f * sin((now / 300.0)).toFloat() else 0.2f
+            dotPaint.color = withAlpha(accent, if (active) (170 + 70 * pulse).toInt() else 160)
+            canvas.drawCircle(dp(19f), h / 2f, dp(2.6f + 0.5f * pulse), dotPaint)
 
-            labelPaint.color = withAlpha(accent, 185)
-            detailPaint.color = Color.rgb(228, 247, 255)
-            val textLeft = dp(34f)
-            canvas.drawText(
-                label,
-                textLeft,
-                h / 2f - dp(3.5f),
-                labelPaint,
-            )
-            val available = w - textLeft - dp(48f)
+            labelPaint.color = withAlpha(accent, 190)
+            detailPaint.color = Color.rgb(24, 27, 29)
+            val textLeft = dp(33f)
+            canvas.drawText(label, textLeft, h / 2f - dp(3.5f), labelPaint)
+
+            val available = w - textLeft - dp(46f)
             val shown = if (detailPaint.measureText(detail) > available) {
                 ellipsize(detail, available)
             } else {
                 detail
             }
-            canvas.drawText(shown, textLeft, h / 2f + dp(12f), detailPaint)
+            canvas.drawText(shown, textLeft, h / 2f + dp(11.5f), detailPaint)
 
             if (active) {
-                var x = w - dp(30f)
+                var x = w - dp(28f)
                 for (i in 0 until 4) {
                     val level = 0.28f + 0.72f * kotlin.math.abs(
-                        kotlin.math.sin(
-                            (now / (190f + i * 47f) + i * 0.8f).toDouble(),
-                        ).toFloat(),
+                        sin((now / (190f + i * 47f) + i * 0.8f).toDouble()).toFloat(),
                     )
-                    val barHeight = dp(14f) * level
-                    barPaint.color = withAlpha(accent, 215)
-                    val left = x + i * dp(5.2f)
+                    val barHeight = dp(13f) * level
+                    barPaint.color = withAlpha(accent, 190)
+                    val left = x + i * dp(5f)
                     canvas.drawRoundRect(
                         left,
                         h / 2f - barHeight / 2f,
-                        left + dp(2.4f),
+                        left + dp(2.2f),
                         h / 2f + barHeight / 2f,
                         dp(2f),
                         dp(2f),

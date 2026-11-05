@@ -44,6 +44,7 @@ class VoiceService : Service() {
     private var lastText = "Starting…"
     private var consecutiveErrors = 0
     private var wakeLock: PowerManager.WakeLock? = null
+    private var acknowledgement: Runnable? = null
 
     private val restart = Runnable {
         if (running && !processing) startListening()
@@ -309,7 +310,7 @@ class VoiceService : Service() {
         state = "armed"
         cancelListening()
         updateNotification("Wake word heard. Listening…")
-        speakThen("Yes, sir?") { if (running) startListeningSoon(180) }
+        speakThen("Yes, sir?") { if (running) startListeningSoon(80) }
     }
 
     private fun process(command: String) {
@@ -323,7 +324,15 @@ class VoiceService : Service() {
         conversation = false
         TtsManager.stop()
         updateNotification("Thinking…")
+        val ack = Runnable {
+            if (processing && running) TtsManager.speak("On it, sir.")
+        }
+        acknowledgement = ack
+        main.postDelayed(ack, 260L)
         JarvisEngine.chat(command) { result ->
+            acknowledgement?.let { main.removeCallbacks(it) }
+            acknowledgement = null
+            TtsManager.stop()
             if (!running) {
                 processing = false
                 return@chat
@@ -343,7 +352,7 @@ class VoiceService : Service() {
                     conversation = true
                     armedAt = SystemClock.elapsedRealtime()
                 }
-                startListeningSoon(220)
+                startListeningSoon(120)
             }
         }
     }
@@ -353,7 +362,7 @@ class VoiceService : Service() {
         conversation = false
         state = "waiting for wake word"
         updateNotification("Standing by")
-        speakThen("Standing by.") { if (running) startListeningSoon(180) }
+        speakThen("Standing by.") { if (running) startListeningSoon(100) }
     }
 
     private fun expireSession() {
@@ -385,13 +394,13 @@ class VoiceService : Service() {
 
     private fun speakThen(text: String, next: () -> Unit) {
         if (!TtsManager.isReady()) {
-            main.postDelayed(next, 150)
+            main.postDelayed(next, 40)
             return
         }
         val finished = AtomicBoolean(false)
         val action = {
             if (finished.compareAndSet(false, true)) {
-                main.postDelayed(next, 180)
+                main.postDelayed(next, 60)
             }
         }
         TtsManager.speak(text, action)
@@ -470,7 +479,7 @@ class VoiceService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         return NotificationCompat.Builder(this, JarvisApp.VOICE_CHANNEL)
-            .setSmallIcon(R.drawable.ic_jarvis)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("Jarvis")
             .setContentText(text)
             .setContentIntent(open)
