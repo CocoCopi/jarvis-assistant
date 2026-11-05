@@ -66,7 +66,7 @@ Everything (voice + desktop + web + phone control) is installed by `install.sh`:
 | Web | `web_search`, `fetch_url`, `http_request` | no |
 | Desktop | `screenshot`, `mouse_control`, `keyboard_control`, `clipboard`, `power` | power |
 | Phone | `phone_control`, `phone_shell`, `phone_adb`, `phone_install`, `phone_uninstall` | shell, adb, install, uninstall |
-| Android app | `android_screen`, `android_node`, `android_gesture`, `android_text`, `android_notifications`, `android_apps`, `android_shell` | shell, SMS, install, device admin, Python |
+| Android app | `android_screen`, `android_node`, `android_gesture`, `android_text`, `android_system`, `android_settings`, `android_notifications`, `android_apps`, `android_camera`, `android_share`, `android_files`, `android_shell` | shell, SMS, install, device admin, Python |
 | Memory | `remember`, `recall`, `forget`, `set_timer` | no |
 | Apps | `open_app` | no |
 | Self-extension | `create_skill`, `delete_skill`, `list_skills` | create |
@@ -132,12 +132,24 @@ long-press, double-tap, swipe, scroll, pinch, and run arbitrary multi-touch
 paths. It also reads notifications and can open, dismiss, snooze, press
 notification actions, and reply through notification RemoteInput.
 
-Wake word: open the app, tap **ALWAYS**, grant microphone and notification
-permission, and say **"Jarvis"**. The service listens in short sessions,
-restarts after silence/errors, detects the wake word from partial results after
-a short quiet window, and always resumes even if TTS never reports completion.
-On Android 14+ a microphone foreground service cannot always start itself after
-a reboot; open the app once and tap **ALWAYS** if wake word is inactive.
+Wake word: open the app, tap **ENGAGE**, grant microphone and notification
+permission, and say **"Jarvis"**. After the first wake word, Jarvis stays in
+conversation mode for two minutes, so follow-up commands need no wake word. Say
+"stop listening" or "that's all" to return to wake-word mode. The service
+reuses one recognizer, restarts after silence/errors, detects the wake word from
+partial results after a short quiet window, holds a partial wake lock, and
+resumes even if TTS never reports completion. On Android 14+ a microphone
+foreground service cannot always start itself after a reboot; open the app once
+and tap **ENGAGE** if wake word is inactive.
+
+The floating **island** overlay shows the live state, transcript and tool
+activity above other apps. It uses an accessibility overlay when Accessibility
+is enabled, otherwise the "Display over other apps" permission from **ACCESS**.
+Tap the island to reopen Jarvis.
+
+The app UI is a custom Material 3 console: animated core, custom backdrop,
+asymmetric conversation bubbles, live status pill, quick actions and a command
+bar. It is not the stock Material template.
 
 Builds are done by GitHub Actions because this project does not require a local
 Android SDK. The repository must be public for the app to fetch releases without
@@ -160,16 +172,16 @@ base64 -w0 release.keystore        # paste into ANDROID_KEYSTORE_BASE64
 - `ANDROID_KEY_ALIAS` (the alias defaults to `jarvis`)
 - `ANDROID_KEY_PASSWORD` (optional; defaults to the keystore password)
 
-Then push a tag such as `v0.6.1`. The workflow builds and signs the APK, packages
+Then push a tag such as `v0.7.0`. The workflow builds and signs the APK, packages
 the Python source, and attaches both to that GitHub release. Install the APK
 once. Future code updates are downloaded by the app; APK updates use the same
 signature and keep app data. A different signing key always requires one
 uninstall, so set the secrets before installing.
 
 After installing, open **Access** and grant the permissions you want:
-accessibility (screen reading, taps, screenshots), notification listener,
-battery exemption, all-files access, overlay, install-unknown-apps, SMS/calls/
-contacts/location, and device admin. For root shell, root the phone and grant
+accessibility (screen reading, taps, gestures, screenshots), notification
+listener, battery exemption, all-files access, overlay, install-unknown-apps,
+SMS/calls/contacts/location, write-system-settings, DND access, and device admin. For root shell, root the phone and grant
 `su`; for device-owner policy control, use the ADB command shown in the app.
 
 Build requirements for local builds: JDK 17, Python 3.14 (must match Chaquopy),

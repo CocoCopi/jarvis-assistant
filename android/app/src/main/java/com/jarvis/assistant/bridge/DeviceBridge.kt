@@ -32,6 +32,7 @@ import com.jarvis.assistant.admin.JarvisDeviceAdminReceiver
 import com.jarvis.assistant.engine.CodeUpdater
 import com.jarvis.assistant.services.JarvisAccessibilityService
 import com.jarvis.assistant.services.JarvisNotificationService
+import com.jarvis.assistant.ui.JarvisOverlay
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
@@ -89,6 +90,7 @@ object DeviceBridge {
     @JvmStatic
     fun logTool(name: String, args: String) {
         MainActivity.current?.appendTool(name, args)
+        JarvisOverlay.update("thinking", "Tool · ${name.replace('_', ' ')}")
     }
 
     @JvmStatic
@@ -977,6 +979,46 @@ object DeviceBridge {
             "Updated: ${Date(info.lastUpdateTime)}\n" +
             "Enabled: ${app.enabled}\n" +
             "Permissions: ${permissions.ifBlank { "none" }}"
+    }
+
+    @JvmStatic
+    fun systemAction(action: String, minutes: Int): String = guarded {
+        val key = action.trim().lowercase(Locale.US)
+        val ctx = context()
+        when (key) {
+            "back", "home", "recents", "recent", "notifications", "quicksettings",
+            "quick_settings", "lock", "screen_off", "dismiss_keyboard", "hide_keyboard" -> {
+                service()?.pressKey(key) ?: "Accessibility service is not enabled."
+            }
+            "screen_on", "wake" -> {
+                val pm = ctx.getSystemService(android.os.PowerManager::class.java)
+                if (pm.isInteractive) {
+                    "Screen is already on."
+                } else {
+                    @Suppress("DEPRECATION")
+                    val lock = pm.newWakeLock(
+                        android.os.PowerManager.FULL_WAKE_LOCK or
+                            android.os.PowerManager.ACQUIRE_CAUSES_WAKEUP or
+                            android.os.PowerManager.ON_AFTER_RELEASE,
+                        "Jarvis:wake",
+                    )
+                    lock.acquire(5000L)
+                    "Screen on."
+                }
+            }
+            "stay_awake", "keep_screen_on" -> {
+                val pm = ctx.getSystemService(android.os.PowerManager::class.java)
+                @Suppress("DEPRECATION")
+                val lock = pm.newWakeLock(
+                    android.os.PowerManager.SCREEN_BRIGHT_WAKE_LOCK or
+                        android.os.PowerManager.ON_AFTER_RELEASE,
+                    "Jarvis:keep-awake",
+                )
+                lock.acquire(minutes.coerceIn(1, 180) * 60_000L)
+                "Screen will stay on for ${minutes.coerceIn(1, 180)} minutes."
+            }
+            else -> "Unknown system action: $action"
+        }
     }
 
     @JvmStatic

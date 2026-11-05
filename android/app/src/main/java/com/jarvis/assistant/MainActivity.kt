@@ -305,10 +305,8 @@ class MainActivity : AppCompatActivity() {
         runOnUiThread {
             val clean = args.replace("\n", " ").take(320)
             append("Tool", "$name $clean", dim = true)
-            if (!VoiceService.running) {
-                JarvisOverlay.ensure(this)
-                JarvisOverlay.update("thinking", "Tool · ${name.replace('_', ' ')}")
-            }
+            JarvisOverlay.ensure(this)
+            JarvisOverlay.update("thinking", "Tool · ${name.replace('_', ' ')}")
         }
     }
 

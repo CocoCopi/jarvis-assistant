@@ -203,6 +203,10 @@ def app_details(package: str) -> str:
     return _result(call("appDetails", package))
 
 
+def system_action(action: str, minutes: int = 30) -> str:
+    return _result(call("systemAction", action, int(minutes)))
+
+
 def clipboard(action: str, text: str = "") -> str:
     action = action.lower()
     if action == "read":
@@ -426,6 +430,16 @@ def build_android_tools() -> list[Tool]:
                 "text": {"type": "string"},
             },
             device_settings,
+            ["action"],
+        ),
+        _tool(
+            "android_system",
+            "Global phone actions: back, home, recents, notifications, quicksettings, lock, screen_off, dismiss_keyboard, screen_on, stay_awake (minutes).",
+            {
+                "action": {"type": "string"},
+                "minutes": {"type": "integer"},
+            },
+            system_action,
             ["action"],
         ),
         _tool(

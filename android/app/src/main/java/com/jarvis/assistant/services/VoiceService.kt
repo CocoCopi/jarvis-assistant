@@ -14,6 +14,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.PowerManager
 import android.os.SystemClock
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
@@ -43,6 +44,7 @@ class VoiceService : Service() {
     private var lastText = "Starting…"
     private var ignoreRecognizerErrors = false
     private var consecutiveErrors = 0
+    private var wakeLock: PowerManager.WakeLock? = null
 
     private val restart = Runnable {
         if (running && !processing) startListening()
@@ -67,6 +69,16 @@ class VoiceService : Service() {
         running = true
         state = "starting"
         detail = "Initialising core"
+        try {
+            wakeLock = getSystemService(PowerManager::class.java)
+                .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Jarvis:voice")
+                .apply {
+                    setReferenceCounted(false)
+                    acquire()
+                }
+        } catch (_: Throwable) {
+            wakeLock = null
+        }
         JarvisEngine.init(applicationContext)
         JarvisOverlay.attach(this)
     }
@@ -114,6 +126,11 @@ class VoiceService : Service() {
         main.removeCallbacksAndMessages(null)
         destroyRecognizer()
         TtsManager.stop()
+        try {
+            wakeLock?.release()
+        } catch (_: Throwable) {
+        }
+        wakeLock = null
         JarvisOverlay.detach()
         stopForeground(STOP_FOREGROUND_REMOVE)
         super.onDestroy()
