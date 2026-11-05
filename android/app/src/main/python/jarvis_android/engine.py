@@ -240,7 +240,9 @@ def _fast_reply(text: str) -> str | None:
         first = listed.splitlines()[0] if listed else ""
         if first and " - " in first and "No apps matched" not in listed:
             package, _, label = first.partition(" - ")
-            call("launchApp", package)
+            launched = str(call("launchApp", package))
+            if "no launchable" in launched.lower() or launched.lower().startswith("error"):
+                return None
             return f"Opening {label}, sir."
         return None
 

@@ -132,7 +132,7 @@ long-press, double-tap, swipe, scroll, pinch, and run arbitrary multi-touch
 paths. It also reads notifications and can open, dismiss, snooze, press
 notification actions, and reply through notification RemoteInput.
 
-Wake word: open the app, tap **ENGAGE**, grant microphone and notification
+Wake word: open the app, tap **LISTEN**, grant microphone and notification
 permission, and say **"Jarvis"**. After the first wake word, Jarvis stays in
 conversation mode for two minutes, so follow-up commands need no wake word. Say
 "stop listening" or "that's all" to return to wake-word mode. The service
@@ -140,16 +140,22 @@ reuses one recognizer, restarts after silence/errors, detects the wake word from
 partial results after a short quiet window, holds a partial wake lock, and
 resumes even if TTS never reports completion. On Android 14+ a microphone
 foreground service cannot always start itself after a reboot; open the app once
-and tap **ENGAGE** if wake word is inactive.
+and tap **LISTEN** if wake word is inactive.
 
 The floating **island** overlay shows the live state, transcript and tool
 activity above other apps. It uses an accessibility overlay when Accessibility
-is enabled, otherwise the "Display over other apps" permission from **ACCESS**.
+is enabled, otherwise the "Display over other apps" permission from the menu.
 Tap the island to reopen Jarvis.
 
-The app UI is a custom Material 3 console: animated core, custom backdrop,
-asymmetric conversation bubbles, live status pill, quick actions and a command
-bar. It is not the stock Material template.
+The app is a light, editorial Material 3 console, not the dark sci-fi template:
+a warm porcelain field, a fine-line arc reactor, a single command rule and a
+quiet conversation log with no bubbles, chips or debug noise. The menu holds
+Access, Settings, source sync, APK update and clear-conversation.
+
+Common commands skip the model entirely and answer immediately: time, date,
+lock, home, back, recents, screenshot, torch, volume, media keys, battery,
+greetings and opening installed apps. Everything else goes to the model with a
+terse British-butler prompt and the full 42-tool Android surface.
 
 Builds are done by GitHub Actions because this project does not require a local
 Android SDK. The repository must be public for the app to fetch releases without
@@ -172,7 +178,7 @@ base64 -w0 release.keystore        # paste into ANDROID_KEYSTORE_BASE64
 - `ANDROID_KEY_ALIAS` (the alias defaults to `jarvis`)
 - `ANDROID_KEY_PASSWORD` (optional; defaults to the keystore password)
 
-Then push a tag such as `v0.7.0`. The workflow builds and signs the APK, packages
+Then push a tag such as `v0.8.0`. The workflow builds and signs the APK, packages
 the Python source, and attaches both to that GitHub release. Install the APK
 once. Future code updates are downloaded by the app; APK updates use the same
 signature and keep app data. A different signing key always requires one

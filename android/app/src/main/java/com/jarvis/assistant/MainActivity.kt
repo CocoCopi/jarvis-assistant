@@ -18,7 +18,6 @@ import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.ImageButton
-import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -334,6 +333,7 @@ class MainActivity : AppCompatActivity() {
         thinkingFrame = 0
         val row = messageShell("J.A.R.V.I.S.", "", user = false, thinking = true)
         val body = row.getChildAt(1) as TextView
+        body.text = "·  "
         pendingRow = row
         pendingBody = body
         row.alpha = 0f
