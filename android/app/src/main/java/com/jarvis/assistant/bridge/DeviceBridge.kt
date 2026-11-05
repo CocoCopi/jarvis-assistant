@@ -775,13 +775,13 @@ object DeviceBridge {
                     nm.setInterruptionFilter(filter)
                     "Do Not Disturb filter set."
                 } else {
-                    openSettings(ctx, Settings.ACTION_ZEN_MODE_ACCESS_SETTINGS)
+                    openSettings(ctx, "android.settings.ZEN_MODE_ACCESS_SETTINGS")
                     "Grant DND access in the screen that opened."
                 }
             }
             "wifi" -> openPanel(ctx, Settings.Panel.ACTION_WIFI)
             "internet" -> openPanel(ctx, Settings.Panel.ACTION_INTERNET_CONNECTIVITY)
-            "bluetooth" -> openPanel(ctx, Settings.Panel.ACTION_BLUETOOTH)
+            "bluetooth" -> openSettings(ctx, Settings.ACTION_BLUETOOTH_SETTINGS)
             "volume_panel" -> openPanel(ctx, Settings.Panel.ACTION_VOLUME)
             "airplane" -> openSettings(ctx, Settings.ACTION_AIRPLANE_MODE_SETTINGS)
             "location" -> openSettings(ctx, Settings.ACTION_LOCATION_SOURCE_SETTINGS)
@@ -968,7 +968,7 @@ object DeviceBridge {
             packageName,
             PackageManager.GET_PERMISSIONS or PackageManager.GET_META_DATA,
         )
-        val app = info.applicationInfo
+        val app = info.applicationInfo ?: return@guarded "No application info for $packageName."
         val permissions = info.requestedPermissions?.joinToString(", ") ?: ""
         "Package: $packageName\n" +
             "Label: ${pm.getApplicationLabel(app)}\n" +
