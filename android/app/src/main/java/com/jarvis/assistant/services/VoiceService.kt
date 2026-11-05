@@ -42,7 +42,6 @@ class VoiceService : Service() {
     private var armedAt = 0L
     private var settings = SettingsStore.load(JarvisApp.instance)
     private var lastText = "Starting…"
-    private var ignoreRecognizerErrors = false
     private var consecutiveErrors = 0
     private var wakeLock: PowerManager.WakeLock? = null
 
@@ -141,7 +140,6 @@ class VoiceService : Service() {
         main.removeCallbacks(partialArm)
         main.removeCallbacks(restart)
         expireSession()
-        ignoreRecognizerErrors = false
         val speech = ensureRecognizer()
         if (speech == null) {
             state = "unavailable"
@@ -161,8 +159,8 @@ class VoiceService : Service() {
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1600L)
         }
         try {
-            speech.startListening(intent)
             listening = true
+            speech.startListening(intent)
             state = if (settings.useWakeWord && !armed) "waiting for wake word" else "listening"
             updateNotification(
                 if (settings.useWakeWord && !armed) {
@@ -203,6 +201,7 @@ class VoiceService : Service() {
         }
 
         override fun onBeginningOfSpeech() {
+            if (!listening) return
             state = "hearing speech"
             updateNotification("Listening…")
         }
@@ -215,10 +214,10 @@ class VoiceService : Service() {
         }
 
         override fun onError(error: Int) {
+            val wasListening = listening
             listening = false
             main.removeCallbacks(watchdog)
-            if (!running) return
-            if (ignoreRecognizerErrors) return
+            if (!running || !wasListening) return
             if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) {
                 updateNotification("Microphone permission is required")
                 stopSelf()
@@ -234,9 +233,11 @@ class VoiceService : Service() {
         }
 
         override fun onResults(results: Bundle?) {
+            val wasListening = listening
             listening = false
             main.removeCallbacks(watchdog)
             main.removeCallbacks(partialArm)
+            if (!wasListening) return
             val text = firstResult(results)
             if (text.isBlank()) {
                 if (armed) {
@@ -252,6 +253,7 @@ class VoiceService : Service() {
         }
 
         override fun onPartialResults(partialResults: Bundle?) {
+            if (!listening) return
             val text = firstResult(partialResults)
             if (text.isBlank()) return
             updateNotification(text.take(90))
@@ -304,7 +306,6 @@ class VoiceService : Service() {
         armed = true
         conversation = true
         armedAt = SystemClock.elapsedRealtime()
-        ignoreRecognizerErrors = true
         state = "armed"
         cancelListening()
         updateNotification("Wake word heard. Listening…")
@@ -414,12 +415,10 @@ class VoiceService : Service() {
     private fun cancelListening() {
         listening = false
         main.removeCallbacks(watchdog)
-        ignoreRecognizerErrors = true
         try {
             recognizer?.cancel()
         } catch (_: Throwable) {
         }
-        main.postDelayed({ ignoreRecognizerErrors = false }, 600)
     }
 
     private fun destroyRecognizer() {
